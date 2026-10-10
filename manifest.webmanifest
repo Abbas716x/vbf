@@ -1,0 +1,17 @@
+{
+  "name": "MEDINEXUS PRO - نظام العيادات الطبية",
+  "short_name": "MediNexus",
+  "description": "نظام إدارة العيادات والمراكز الطبية الذكي - بوابة الإدارة والأطباء",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#070b19",
+  "theme_color": "#070b19",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🩺</text></svg>",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

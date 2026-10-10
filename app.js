@@ -748,4 +748,233 @@
         $('#pt-name').value = '';
         $('#pt-phone').value = '';
         $('#pt-treatment-select').value = '';
-        $('#pt
+        $('#pt-final-price').value = '';
+        $('#pt-base-price-hint').textContent = 'السعر الافتراضي: 0';
+
+        // Pre-fill next session date with default 7 days from now at 10:00 AM
+        const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        nextWeek.setHours(10, 0, 0, 0);
+        const isoLocal = new Date(nextWeek.getTime() - nextWeek.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        $('#pt-session2-date').value = isoLocal;
+
+        $('#doctor-view-add-patient').classList.remove('hidden');
+        setTimeout(() => $('#pt-name').focus(), 200);
+    }
+
+    function closeAddPatientFullScreen() {
+        $('#doctor-view-add-patient').classList.add('hidden');
+    }
+
+    function onTreatmentSelectChange(treatmentId) {
+        const trt = State.treatments.find(t => t.id === treatmentId);
+        if (trt) {
+            $('#pt-final-price').value = trt.defaultPrice;
+            $('#pt-base-price-hint').textContent = `السعر الافتراضي: ${fmt(trt.defaultPrice)} IQD`;
+        } else {
+            $('#pt-final-price').value = '';
+            $('#pt-base-price-hint').textContent = 'السعر الافتراضي: 0';
+        }
+    }
+
+    // Submission & Notification Generation
+    async function submitPatientSession() {
+        if (!State.currentDoctor) {
+            toast('جلسة الطبيب منتهية، يرجى تسجيل الدخول مجدداً', 'error');
+            return;
+        }
+
+        // Check if doctor is still active
+        const liveDoc = State.doctors.find(d => d.uid === State.currentDoctor.uid);
+        if (liveDoc && liveDoc.isActive === false) {
+            await DialogEngine.alert('⚠️ تم تجميد حسابك من قبل الإدارة المركزية، لا يمكن حفظ الجلسة.', 'حساب معلق');
+            return;
+        }
+
+        const patientName = $('#pt-name').value.trim();
+        const patientPhone = $('#pt-phone').value.trim();
+        const treatmentSelect = $('#pt-treatment-select');
+        const treatmentId = treatmentSelect.value;
+        const finalPrice = Number($('#pt-final-price').value) || 0;
+        const session2Date = $('#pt-session2-date').value;
+
+        if (!patientName || !patientPhone || !treatmentId || !session2Date) {
+            toast('يرجى ملء جميع الحقول المطلوبة', 'error');
+            return;
+        }
+
+        const selectedOption = treatmentSelect.options[treatmentSelect.selectedIndex];
+        const treatmentName = selectedOption ? selectedOption.text.split('—')[0].trim() : 'علاج طبي';
+
+        const nowIso = new Date().toISOString();
+        const formattedNow = formatDate(nowIso);
+        const formattedSession2 = formatDate(session2Date);
+
+        // Required Structured Patient Notification Template (قالب الإشعار المحدد بالطلب)
+        const notificationText = 
+`مرحباً بك في عيادة الدكتور ${State.currentDoctor.name}
+اسم المريض: ${patientName}
+الجلسة الأولى
+اسم العلاج: ${treatmentName}
+سعره: ${fmt(finalPrice)} IQD
+تاريخ الجلسة الأولى: ${formattedNow}
+موعد الجلسة الثانية والوقت والتاريخ: ${formattedSession2}`;
+
+        const sessionPayload = {
+            doctorId: State.currentDoctor.uid,
+            doctorName: State.currentDoctor.name,
+            patientName,
+            patientPhone,
+            treatmentName,
+            finalPrice,
+            session1Date: nowIso,
+            session2Date
+        };
+
+        const submitBtn = $('#btn-submit-patient');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'جارِ حفظ الجلسة وتحديث السحابة...';
+
+        try {
+            await window.MedicalFirebase.recordPatientSessionCloud(sessionPayload);
+
+            submitBtn.disabled = false;
+            submitBtn.textContent = '✓ حفظ الجلسة وإصدار الإشعار المنظم';
+
+            closeAddPatientFullScreen();
+            showDoctorDashboard();
+
+            // Open Template Notification Preview Modal
+            State.generatedMessage = notificationText;
+            State.lastPatientPhone = patientPhone;
+            $('#notification-template-text').textContent = notificationText;
+            openModal('modal-notification-preview');
+
+            toast('تم حفظ الجلسة وتحديث الإيرادات بنجاح ✓', 'success');
+        } catch (e) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = '✓ حفظ الجلسة وإصدار الإشعار المنظم';
+            toast('حدث خطأ أثناء حفظ الجلسة في السحابة', 'error');
+        }
+    }
+
+    function sendWhatsAppNotification() {
+        if (!State.generatedMessage) return;
+        let phone = String(State.lastPatientPhone || '').replace(/\D/g, '');
+        // Standardize Iraqi local phone numbers to international +964
+        if (phone.startsWith('07')) phone = '964' + phone.slice(1);
+        if (phone.startsWith('7')) phone = '964' + phone;
+
+        const encoded = encodeURIComponent(State.generatedMessage);
+        const waUrl = phone ? `https://wa.me/${phone}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
+        window.open(waUrl, '_blank');
+    }
+
+    function copyNotificationText() {
+        if (!State.generatedMessage) return;
+        navigator.clipboard.writeText(State.generatedMessage).then(() => {
+            toast('تم نسخ نص الرسالة إلى الحافظة ✓', 'success');
+        }).catch(() => {
+            toast('يرجى تحديد النص ونسخه يدوياً', 'warn');
+        });
+    }
+
+    // ==================== SYSTEM LIFECYCLE & SUBSCRIPTIONS ====================
+    async function initSystem() {
+        // Initialize Firebase Engine
+        await window.MedicalFirebase.init();
+
+        // 1. Subscribe to Live Finances
+        window.MedicalFirebase.subscribeFinances(data => {
+            State.finances = data || { dailyTotal: 0, monthlyTotal: 0 };
+            renderFinances();
+        });
+
+        // 2. Subscribe to Central Treatments Catalog
+        window.MedicalFirebase.subscribeTreatments(list => {
+            State.treatments = list || [];
+            renderTreatments();
+        });
+
+        // 3. Subscribe to Doctors & Live Statuses
+        window.MedicalFirebase.subscribeDoctors(list => {
+            State.doctors = list || [];
+            renderDoctors();
+
+            // Live security check for active doctor
+            if (State.currentDoctor) {
+                const updatedMe = State.doctors.find(d => d.uid === State.currentDoctor.uid);
+                if (updatedMe && updatedMe.isActive === false) {
+                    logoutDoctor();
+                    DialogEngine.alert('🚨 تم إيقاف / تجميد جلستك من قبل الإدارة المركزية.', 'إلغاء الجلسة');
+                }
+            }
+        });
+
+        // 4. Subscribe to Sessions
+        window.MedicalFirebase.subscribeSessions(list => {
+            State.sessions = list || [];
+            renderSessions();
+            renderDoctors();
+            if (State.currentDoctor) renderDoctorAssignedDashboard();
+        });
+
+        // 5. Subscribe to Debts
+        window.MedicalFirebase.subscribeDebts(list => {
+            State.debts = list || [];
+            renderDebts();
+            renderFinances();
+        });
+
+        // Restore cached doctor session if available
+        const cachedDoc = localStorage.getItem('medinexus_active_doctor');
+        if (cachedDoc) {
+            try {
+                State.currentDoctor = JSON.parse(cachedDoc);
+            } catch (e) {}
+        }
+
+        // Live Clock
+        setInterval(() => {
+            const clockEl = $('#live-clock');
+            if (clockEl) clockEl.textContent = new Date().toLocaleTimeString('en-GB');
+        }, 1000);
+
+        // Escape Key Modal Dismissal
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') {
+                ['modal-add-doctor', 'modal-doctor-details', 'modal-add-treatment', 'modal-add-debt', 'modal-notification-preview'].forEach(id => closeModal(id));
+                closeDrawer();
+                if (!$('#doctor-view-add-patient').classList.contains('hidden')) {
+                    closeAddPatientFullScreen();
+                }
+            }
+        });
+
+        console.log('%c🚀 MEDINEXUS PRO Master Application Engine Online', 'color:#00F0FF;font-weight:900');
+    }
+
+    // Public Surface Binding API
+    window.ClinicEngine = {
+        openDrawer, closeDrawer,
+        togglePortalMode, setPortalMode, switchAdminView, headerQuickAction,
+        transferDailyRevenue,
+        openAddDoctorModal, confirmCreateDoctor, openDoctorDetailsModal, toggleDoctorFreeze,
+        openAddTreatmentModal, confirmCreateTreatment, deleteTreatment,
+        openAddDebtModal, confirmCreateDebt, filterDebts, openPayDebtPrompt,
+        exportSessionsCSV,
+        handleDoctorLogin, logoutDoctor,
+        openAddPatientFullScreen, closeAddPatientFullScreen, onTreatmentSelectChange, submitPatientSession,
+        sendWhatsAppNotification, copyNotificationText,
+        refreshCloudData: () => window.location.reload(),
+        handleLogout: () => {
+            if (confirm('هل ترغب بتسجيل الخروج؟')) window.location.reload();
+        },
+        closeModal
+    };
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSystem);
+    } else {
+        initSystem();
+    }
+})();

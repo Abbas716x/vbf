@@ -1,11 +1,11 @@
 /* ==================================================================
-   MEDINEXUS PRO — Firebase Cloud Engine & Firestore Architecture
+   MEDINEXUS PRO — Resilient Firebase Engine & Data Operations
    ================================================================== */
 
 (function () {
     'use strict';
 
-    // The Exact Firebase Configuration Matrix Provided
+    // The Exact Production Firebase Configuration
     const firebaseConfig = {
         apiKey: "AIzaSyCd6qs1X8nkcU7Vao9F8Q5qUHXNJ9Bqv7k",
         authDomain: "qre7-f3a35.firebaseapp.com",
@@ -21,14 +21,16 @@
     let fbAuth = null;
     let isCloudReady = false;
 
-    // Database Collections Schemas
-    const COLL_USERS = 'users';           // { uid, name, role, phone, username, isActive, subPassword }
-    const COLL_TREATMENTS = 'treatments'; // { id, name, defaultPrice, createdAt }
+    // Standardized Collection Names
+    const COLL_USERS = 'users';           // { uid, name, role, phone, username, subPassword, isActive }
+    const COLL_TREATMENTS = 'treatments'; // { id, name, defaultPrice, stock, consumed, createdAt }
     const COLL_SESSIONS = 'sessions';     // { id, doctorId, doctorName, patientName, patientPhone, treatmentName, finalPrice, session1Date, session2Date }
     const COLL_FINANCES = 'finances';     // { dailyTotal, monthlyTotal, lastResetDate }
     const COLL_DEBTS = 'debts';           // { id, patientName, patientPhone, remainingAmount, createdAt }
+    const COLL_ACTIVITIES = 'activities'; // { id, type, title, details, user, role, timestamp }
+    const COLL_CONSUMED_LOGS = 'consumed_logs'; // { id, treatmentId, treatmentName, doctorId, doctorName, qty, timestamp }
 
-    // Status Indicator Dispatcher
+    // Status Indicator
     function updateStatusIndicator(status, text) {
         try {
             const el = document.getElementById('fb-status');
@@ -40,35 +42,31 @@
         } catch (e) {}
     }
 
-    // Initialize Firebase SDK with Offline Persistence
+    // Initialize Firebase
     try {
         if (typeof firebase !== 'undefined' && firebase.initializeApp) {
             fbApp = firebase.initializeApp(firebaseConfig);
             fbDb = firebase.firestore();
             fbAuth = firebase.auth();
 
-            // Enable Multi-Tab Offline Cache Persistence
-            fbDb.enablePersistence({ synchronizeTabs: true }).catch(err => {
-                if (err.code === 'failed-precondition') {
-                    console.warn('[Firebase] Persistence failed: Multiple tabs open');
-                } else if (err.code === 'unimplemented') {
-                    console.warn('[Firebase] Browser does not support persistence');
-                }
+            fbDb.settings({
+                cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED,
+                merge: true
             });
 
             isCloudReady = true;
             updateStatusIndicator('online', 'CONNECTED');
-            console.log('%c🩺 MEDINEXUS Firebase Cloud Engine Active', 'color:#00F0FF;font-weight:bold');
+            console.log('%c🔥 Firebase Firestore Cloud Engine Ready', 'color:#00F0FF;font-weight:bold');
         } else {
-            throw new Error('Firebase SDK Not Loaded');
+            throw new Error('Firebase SDK is not loaded.');
         }
     } catch (err) {
-        console.warn('⚠️ Cloud engine fallback engaged:', err.message);
+        console.error('❌ Firebase Init Error:', err);
         isCloudReady = false;
-        updateStatusIndicator('offline', 'LOCAL_MOCK');
+        updateStatusIndicator('offline', 'OFFLINE');
     }
 
-    // Silent Anonymous Authentication for Client Security
+    // Silent Auth Helper
     async function ensureAuth() {
         if (!isCloudReady || !fbAuth) return false;
         try {
@@ -77,280 +75,430 @@
             }
             return true;
         } catch (e) {
-            console.warn('[Auth] Anonymous session fallback active');
             return false;
         }
     }
 
-    // Seed Initial Financial Record & Default Treatments if empty
-    async function initializeSystemSeed() {
+    // Seed Initial Setup
+    async function verifySeed() {
         if (!isCloudReady || !fbDb) return;
         try {
             await ensureAuth();
-
-            // 1. Finances Document
             const finRef = fbDb.collection(COLL_FINANCES).doc('summary');
-            const finSnap = await finRef.get();
-            if (!finSnap.exists) {
+            const snap = await finRef.get();
+            if (!snap.exists) {
                 await finRef.set({
                     dailyTotal: 0,
                     monthlyTotal: 0,
                     lastResetDate: new Date().toISOString()
                 });
             }
-
-            // 2. Default Treatments Catalog
-            const trtSnap = await fbDb.collection(COLL_TREATMENTS).limit(1).get();
-            if (trtSnap.empty) {
-                const defaultTreatments = [
-                    { id: 'trt_1', name: 'كشف واستشارة طبية عامة', defaultPrice: 15000, createdAt: new Date().toISOString() },
-                    { id: 'trt_2', name: 'تنظيف وتبييض الأسنان', defaultPrice: 35000, createdAt: new Date().toISOString() },
-                    { id: 'trt_3', name: 'حشوة تجميلية كمبوزيت', defaultPrice: 30000, createdAt: new Date().toISOString() },
-                    { id: 'trt_4', name: 'علاج جذور وسحب عصب', defaultPrice: 60000, createdAt: new Date().toISOString() },
-                    { id: 'trt_5', name: 'جلسة تقويم شهري', defaultPrice: 50000, createdAt: new Date().toISOString() }
-                ];
-                const batch = fbDb.batch();
-                defaultTreatments.forEach(t => {
-                    batch.set(fbDb.collection(COLL_TREATMENTS).doc(t.id), t);
-                });
-                await batch.commit();
-            }
-        } catch (e) {
-            console.warn('Silent boundary in seed initialization:', e);
-        }
+        } catch (e) {}
     }
 
-    // ==================== REAL-TIME LISTENERS & OPERATIONS ====================
-
-    // Financial Listeners & Settlement Transfer
-    function subscribeFinances(callback) {
-        if (!isCloudReady || !fbDb) {
-            const local = JSON.parse(localStorage.getItem('medinexus_finances') || '{"dailyTotal":0,"monthlyTotal":0}');
-            callback(local);
-            return () => {};
-        }
-
-        return fbDb.collection(COLL_FINANCES).doc('summary').onSnapshot(doc => {
-            if (doc.exists) {
-                const data = doc.data();
-                localStorage.setItem('medinexus_finances', JSON.stringify(data));
-                callback(data);
-                updateStatusIndicator('online', 'LIVE');
-            }
-        }, err => {
-            console.error('Finances subscription error:', err);
-        });
-    }
-
-    async function transferDailyRevenueCloud(currentDaily, currentMonthly) {
-        updateStatusIndicator('sync', 'TRANSFERRING');
-        const newMonthly = Number(currentMonthly || 0) + Number(currentDaily || 0);
-
-        if (isCloudReady && fbDb) {
-            try {
-                await ensureAuth();
-                await fbDb.collection(COLL_FINANCES).doc('summary').update({
-                    dailyTotal: 0,
-                    monthlyTotal: newMonthly,
-                    lastResetDate: new Date().toISOString()
-                });
-                updateStatusIndicator('online', 'LIVE');
-                return true;
-            } catch (e) {
-                console.error('Cloud transfer error:', e);
-            }
-        }
-
-        // Local Fallback
-        const fallback = { dailyTotal: 0, monthlyTotal: newMonthly, lastResetDate: new Date().toISOString() };
-        localStorage.setItem('medinexus_finances', JSON.stringify(fallback));
-        updateStatusIndicator('online', 'LOCAL');
-        return true;
-    }
-
-    // Treatments Catalog Subscriptions & CRUD
-    function subscribeTreatments(callback) {
-        if (!isCloudReady || !fbDb) {
-            const local = JSON.parse(localStorage.getItem('medinexus_treatments') || '[]');
-            callback(local);
-            return () => {};
-        }
-
-        return fbDb.collection(COLL_TREATMENTS).orderBy('name').onSnapshot(snap => {
-            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            localStorage.setItem('medinexus_treatments', JSON.stringify(list));
-            callback(list);
-        });
-    }
-
-    async function addTreatmentCloud(name, defaultPrice) {
-        const id = 'trt_' + Date.now().toString(36);
-        const item = {
-            id,
-            name: String(name).trim(),
-            defaultPrice: Number(defaultPrice) || 0,
-            createdAt: new Date().toISOString()
-        };
-
-        if (isCloudReady && fbDb) {
-            await ensureAuth();
-            await fbDb.collection(COLL_TREATMENTS).doc(id).set(item);
-            return item;
-        }
-
-        const local = JSON.parse(localStorage.getItem('medinexus_treatments') || '[]');
-        local.push(item);
-        localStorage.setItem('medinexus_treatments', JSON.stringify(local));
-        return item;
-    }
-
-    async function deleteTreatmentCloud(id) {
-        if (isCloudReady && fbDb) {
-            await ensureAuth();
-            await fbDb.collection(COLL_TREATMENTS).doc(id).delete();
-            return true;
-        }
-
-        let local = JSON.parse(localStorage.getItem('medinexus_treatments') || '[]');
-        local = local.filter(t => t.id !== id);
-        localStorage.setItem('medinexus_treatments', JSON.stringify(local));
-        return true;
-    }
-
-    // Doctors Subscriptions & Session Freeze Switch
+    // ==================== 1. USERS & DOCTORS ====================
     function subscribeDoctors(callback) {
-        if (!isCloudReady || !fbDb) {
-            const local = JSON.parse(localStorage.getItem('medinexus_doctors') || '[]');
-            callback(local);
-            return () => {};
-        }
+        if (!isCloudReady || !fbDb) return () => {};
 
-        return fbDb.collection(COLL_USERS).where('role', '==', 'doctor').onSnapshot(snap => {
-            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            localStorage.setItem('medinexus_doctors', JSON.stringify(list));
-            callback(list);
-        });
+        return fbDb.collection(COLL_USERS)
+            .where('role', '==', 'doctor')
+            .onSnapshot(
+                snap => {
+                    const list = snap.docs.map(doc => ({ id: doc.id, uid: doc.id, ...doc.data() }));
+                    callback(list);
+                    updateStatusIndicator('online', 'LIVE');
+                },
+                err => {
+                    console.error('❌ subscribeDoctors Error:', err);
+                }
+            );
     }
 
     async function addDoctorCloud(name, phone, username, subPassword) {
+        if (!isCloudReady || !fbDb) throw new Error('الاتصال بقاعدة البيانات غير متوفر!');
+        await ensureAuth();
+
+        const cleanUser = String(username).trim().toLowerCase();
+        const duplicateCheck = await fbDb.collection(COLL_USERS).where('username', '==', cleanUser).get();
+        if (!duplicateCheck.empty) {
+            throw new Error('اسم المستخدم مسجل مسبقاً لطبيب آخر!');
+        }
+
         const uid = 'doc_' + Date.now().toString(36);
         const doctorData = {
             uid,
             name: String(name).trim(),
             phone: String(phone).trim(),
-            username: String(username).trim().toLowerCase(),
+            username: cleanUser,
             subPassword: String(subPassword).trim(),
             role: 'doctor',
-            isActive: true, // Default: session active
+            isActive: true,
             createdAt: new Date().toISOString()
         };
 
-        if (isCloudReady && fbDb) {
-            await ensureAuth();
-            // Verify username uniqueness
-            const check = await fbDb.collection(COLL_USERS).where('username', '==', doctorData.username).get();
-            if (!check.empty) {
-                throw new Error('اسم المستخدم مسجل مسبقاً لطبيب آخر!');
-            }
-            await fbDb.collection(COLL_USERS).doc(uid).set(doctorData);
-            return doctorData;
-        }
+        await fbDb.collection(COLL_USERS).doc(uid).set(doctorData);
+        await logActivityCloud({
+            type: 'financial',
+            title: `إضافة حساب طبيب: ${doctorData.name}`,
+            details: `المعرف: @${doctorData.username} | هاتف: ${doctorData.phone}`,
+            user: 'المدير العام',
+            role: 'admin'
+        });
 
-        const local = JSON.parse(localStorage.getItem('medinexus_doctors') || '[]');
-        local.push(doctorData);
-        localStorage.setItem('medinexus_doctors', JSON.stringify(local));
         return doctorData;
     }
 
-    // Session Kill / Freeze Switch
-    async function toggleDoctorSessionStatus(doctorId, currentStatus) {
-        const newStatus = !currentStatus; // toggle boolean
-        if (isCloudReady && fbDb) {
-            await ensureAuth();
-            await fbDb.collection(COLL_USERS).doc(doctorId).update({
-                isActive: newStatus
-            });
-            return newStatus;
-        }
+    async function deleteDoctorCloud(doctorId, doctorName) {
+        if (!isCloudReady || !fbDb) throw new Error('الاتصال بقاعدة البيانات غير متوفر!');
+        await ensureAuth();
 
-        const local = JSON.parse(localStorage.getItem('medinexus_doctors') || '[]');
-        const doc = local.find(d => d.uid === doctorId || d.id === doctorId);
-        if (doc) doc.isActive = newStatus;
-        localStorage.setItem('medinexus_doctors', JSON.stringify(local));
+        await fbDb.collection(COLL_USERS).doc(doctorId).delete();
+        await logActivityCloud({
+            type: 'breach',
+            title: `حذف حساب الطبيب: ${doctorName || doctorId}`,
+            details: `تم حذف حساب الطبيب نهائياً من النظام وسحب كافة صلاحياته.`,
+            user: 'المدير العام',
+            role: 'admin'
+        });
+        return true;
+    }
+
+    async function toggleDoctorSessionStatus(doctorId, currentStatus) {
+        if (!isCloudReady || !fbDb) throw new Error('الاتصال بقاعدة البيانات غير متوفر!');
+        await ensureAuth();
+
+        const newStatus = !currentStatus;
+        await fbDb.collection(COLL_USERS).doc(doctorId).update({ isActive: newStatus });
+        await logActivityCloud({
+            type: 'breach',
+            title: newStatus ? 'تفعيل جلسة طبيب' : 'تجميد جلسة طبيب فورياً',
+            details: `تم تغيير حالة الطبيب ID (${doctorId}) إلى: ${newStatus ? 'نشط' : 'مجمد'}`,
+            user: 'المدير العام',
+            role: 'admin'
+        });
         return newStatus;
     }
 
-    // Sessions Subscriptions & Record Creation
-    function subscribeSessions(callback) {
-        if (!isCloudReady || !fbDb) {
-            const local = JSON.parse(localStorage.getItem('medinexus_sessions') || '[]');
-            callback(local);
-            return () => {};
+    async function verifyDoctorCredentials(username, password) {
+        if (!isCloudReady || !fbDb) throw new Error('الاتصال بقاعدة البيانات غير متوفر!');
+        await ensureAuth();
+
+        const cleanUser = String(username).trim().toLowerCase();
+        const cleanPass = String(password).trim();
+
+        const snap = await fbDb.collection(COLL_USERS)
+            .where('role', '==', 'doctor')
+            .where('username', '==', cleanUser)
+            .where('subPassword', '==', cleanPass)
+            .get();
+
+        if (snap.empty) {
+            throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة!');
         }
 
-        return fbDb.collection(COLL_SESSIONS).orderBy('createdAt', 'desc').onSnapshot(snap => {
-            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            localStorage.setItem('medinexus_sessions', JSON.stringify(list));
-            callback(list);
+        const doctorData = snap.docs[0].data();
+        if (doctorData.isActive === false) {
+            throw new Error('تم تجميد حسابك وجلستك من قبل الإدارة المركزية.');
+        }
+
+        return doctorData;
+    }
+
+    // ==================== 2. CENTRAL TREATMENTS CATALOG & STOCK ====================
+    function subscribeTreatments(callback) {
+        if (!isCloudReady || !fbDb) return () => {};
+
+        return fbDb.collection(COLL_TREATMENTS)
+            .onSnapshot(
+                snap => {
+                    const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+                    callback(list);
+                    updateStatusIndicator('online', 'LIVE');
+                },
+                err => {
+                    console.error('❌ subscribeTreatments Error:', err);
+                }
+            );
+    }
+
+    async function addTreatmentCloud(name, defaultPrice, stock = 50) {
+        if (!isCloudReady || !fbDb) throw new Error('الاتصال بقاعدة البيانات غير متوفر!');
+        await ensureAuth();
+
+        const id = 'trt_' + Date.now().toString(36);
+        const item = {
+            id,
+            name: String(name).trim(),
+            defaultPrice: Number(defaultPrice) || 0,
+            stock: Number(stock) || 50,
+            consumed: 0,
+            createdAt: new Date().toISOString()
+        };
+
+        await fbDb.collection(COLL_TREATMENTS).doc(id).set(item);
+        return item;
+    }
+
+    async function updateTreatmentCloud(id, name, defaultPrice, stock) {
+        if (!isCloudReady || !fbDb) throw new Error('الاتصال بقاعدة البيانات غير متوفر!');
+        await ensureAuth();
+
+        await fbDb.collection(COLL_TREATMENTS).doc(id).update({
+            name: String(name).trim(),
+            defaultPrice: Number(defaultPrice) || 0,
+            stock: Number(stock) || 0
         });
+
+        await logActivityCloud({
+            type: 'financial',
+            title: `تعديل سعر ومخزون العلاج: ${name}`,
+            details: `السعر الجديد: ${defaultPrice} IQD | الكمية الكلية: ${stock}`,
+            user: 'المدير العام',
+            role: 'admin'
+        });
+
+        return true;
+    }
+
+    async function deleteTreatmentCloud(id) {
+        if (!isCloudReady || !fbDb) throw new Error('الاتصال بقاعدة البيانات غير متوفر!');
+        await ensureAuth();
+
+        await fbDb.collection(COLL_TREATMENTS).doc(id).delete();
+        return true;
+    }
+
+    // ==================== 3. SESSIONS & CONSUMED LOGS ====================
+    function subscribeSessions(callback) {
+        if (!isCloudReady || !fbDb) return () => {};
+
+        return fbDb.collection(COLL_SESSIONS)
+            .onSnapshot(
+                snap => {
+                    const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+                    callback(list);
+                },
+                err => {
+                    console.error('❌ subscribeSessions Error:', err);
+                }
+            );
     }
 
     async function recordPatientSessionCloud(sessionData) {
-        updateStatusIndicator('sync', 'SAVING');
-        const id = 'sess_' + Date.now().toString(36);
+        if (!isCloudReady || !fbDb) throw new Error('الاتصال بالسحابة غير متوفر!');
+        await ensureAuth();
+
+        const sessionId = 'sess_' + Date.now().toString(36);
         const fullSession = {
-            id,
+            id: sessionId,
             ...sessionData,
             createdAt: new Date().toISOString()
         };
 
-        if (isCloudReady && fbDb) {
-            await ensureAuth();
-            const batch = fbDb.batch();
+        updateStatusIndicator('sync', 'SAVING');
 
-            // 1. Add session record
-            batch.set(fbDb.collection(COLL_SESSIONS).doc(id), fullSession);
+        // 1. Save Session Document
+        await fbDb.collection(COLL_SESSIONS).doc(sessionId).set(fullSession);
 
-            // 2. Increment Daily Revenue in summary
-            const finRef = fbDb.collection(COLL_FINANCES).doc('summary');
-            batch.set(finRef, {
-                dailyTotal: firebase.firestore.FieldValue.increment(Number(sessionData.finalPrice) || 0)
-            }, { merge: true });
-
-            await batch.commit();
-            updateStatusIndicator('online', 'LIVE');
-            return fullSession;
+        // 2. Increment Daily Revenue
+        const sessionPrice = Number(sessionData.finalPrice) || 0;
+        if (sessionPrice > 0) {
+            fbDb.collection(COLL_FINANCES).doc('summary').set({
+                dailyTotal: firebase.firestore.FieldValue.increment(sessionPrice)
+            }, { merge: true }).catch(() => {});
         }
 
-        // Local Storage Fallback
-        const localSessions = JSON.parse(localStorage.getItem('medinexus_sessions') || '[]');
-        localSessions.unshift(fullSession);
-        localStorage.setItem('medinexus_sessions', JSON.stringify(localSessions));
+        // 3. Update Treatment Consumed Count in Catalog
+        if (sessionData.treatmentId) {
+            fbDb.collection(COLL_TREATMENTS).doc(sessionData.treatmentId).update({
+                consumed: firebase.firestore.FieldValue.increment(1)
+            }).catch(() => {});
+        }
 
-        const localFin = JSON.parse(localStorage.getItem('medinexus_finances') || '{"dailyTotal":0,"monthlyTotal":0}');
-        localFin.dailyTotal = (Number(localFin.dailyTotal) || 0) + (Number(sessionData.finalPrice) || 0);
-        localStorage.setItem('medinexus_finances', JSON.stringify(localFin));
+        // 4. Log to Consumed Products Audit
+        const logId = 'csl_' + Date.now().toString(36);
+        fbDb.collection(COLL_CONSUMED_LOGS).doc(logId).set({
+            id: logId,
+            treatmentId: sessionData.treatmentId || '',
+            treatmentName: sessionData.treatmentName,
+            doctorId: sessionData.doctorId,
+            doctorName: sessionData.doctorName,
+            patientName: sessionData.patientName,
+            qty: 1,
+            timestamp: new Date().toISOString()
+        }).catch(() => {});
 
-        updateStatusIndicator('online', 'LOCAL');
+        // 5. Activity Log
+        const actId = 'act_' + Date.now().toString(36);
+        fbDb.collection(COLL_ACTIVITIES).doc(actId).set({
+            id: actId,
+            type: 'session',
+            title: `جلسة مراجع: ${sessionData.patientName}`,
+            details: `العلاج: ${sessionData.treatmentName} | السعر: ${sessionData.finalPrice} IQD`,
+            user: sessionData.doctorName,
+            role: 'doctor',
+            doctorId: sessionData.doctorId,
+            timestamp: new Date().toISOString()
+        }).catch(() => {});
+
+        updateStatusIndicator('online', 'LIVE');
         return fullSession;
     }
 
-    // Debts Registry Subscriptions & CRUD
-    function subscribeDebts(callback) {
-        if (!isCloudReady || !fbDb) {
-            const local = JSON.parse(localStorage.getItem('medinexus_debts') || '[]');
-            callback(local);
-            return () => {};
-        }
+    async function deleteSessionCloud(sessionId) {
+        if (!isCloudReady || !fbDb) throw new Error('الاتصال بقاعدة البيانات غير متوفر!');
+        await ensureAuth();
 
-        return fbDb.collection(COLL_DEBTS).orderBy('createdAt', 'desc').onSnapshot(snap => {
-            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            localStorage.setItem('medinexus_debts', JSON.stringify(list));
-            callback(list);
+        await fbDb.collection(COLL_SESSIONS).doc(sessionId).delete();
+        await logActivityCloud({
+            type: 'financial',
+            title: `حذف وأرشفة جلسة مراجع`,
+            details: `تم حذف وثيقة الجلسة ID: ${sessionId} من السجل النشط للأرشيف.`,
+            user: 'المدير العام',
+            role: 'admin'
         });
+        return true;
+    }
+
+    function subscribeConsumedLogs(callback) {
+        if (!isCloudReady || !fbDb) return () => {};
+
+        return fbDb.collection(COLL_CONSUMED_LOGS)
+            .onSnapshot(
+                snap => {
+                    const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    list.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+                    callback(list);
+                },
+                err => {
+                    console.error('❌ subscribeConsumedLogs Error:', err);
+                }
+            );
+    }
+
+    // ==================== 4. ACTIVITIES LOG ====================
+    function subscribeActivities(callback) {
+        if (!isCloudReady || !fbDb) return () => {};
+
+        return fbDb.collection(COLL_ACTIVITIES)
+            .onSnapshot(
+                snap => {
+                    const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    list.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+                    callback(list.slice(0, 60));
+                },
+                err => {
+                    console.error('❌ subscribeActivities Error:', err);
+                }
+            );
+    }
+
+    async function logActivityCloud(activityData) {
+        if (!isCloudReady || !fbDb) return;
+        try {
+            await ensureAuth();
+            const id = 'act_' + Date.now().toString(36);
+            const record = {
+                id,
+                ...activityData,
+                timestamp: activityData.timestamp || new Date().toISOString()
+            };
+            await fbDb.collection(COLL_ACTIVITIES).doc(id).set(record);
+            return record;
+        } catch (e) {}
+    }
+
+    // ==================== 5. FINANCES, SETTLEMENT & RESETS ====================
+    function subscribeFinances(callback) {
+        if (!isCloudReady || !fbDb) return () => {};
+
+        return fbDb.collection(COLL_FINANCES).doc('summary').onSnapshot(
+            doc => {
+                if (doc.exists) {
+                    callback(doc.data());
+                } else {
+                    callback({ dailyTotal: 0, monthlyTotal: 0 });
+                }
+            },
+            err => {
+                console.error('❌ subscribeFinances Error:', err);
+            }
+        );
+    }
+
+    async function transferDailyRevenueCloud(currentDaily, currentMonthly) {
+        if (!isCloudReady || !fbDb) throw new Error('الاتصال بقاعدة البيانات غير متوفر!');
+        await ensureAuth();
+
+        const newMonthly = Number(currentMonthly || 0) + Number(currentDaily || 0);
+
+        await fbDb.collection(COLL_FINANCES).doc('summary').set({
+            dailyTotal: 0,
+            monthlyTotal: newMonthly,
+            lastResetDate: new Date().toISOString()
+        }, { merge: true });
+
+        await logActivityCloud({
+            type: 'financial',
+            title: 'الترحيل المالي اليومي',
+            details: `تم ترحيل مبلغ ${currentDaily} IQD إلى الإيراد الشهري وتصفير اليوم`,
+            user: 'المدير العام',
+            role: 'admin'
+        });
+
+        return true;
+    }
+
+    async function fullSystemResetCloud() {
+        if (!isCloudReady || !fbDb) throw new Error('الاتصال بقاعدة البيانات غير متوفر!');
+        await ensureAuth();
+
+        // 1. Reset Finances to Zero
+        await fbDb.collection(COLL_FINANCES).doc('summary').set({
+            dailyTotal: 0,
+            monthlyTotal: 0,
+            lastResetDate: new Date().toISOString()
+        });
+
+        // 2. Clear Debts Collection
+        const debtsSnap = await fbDb.collection(COLL_DEBTS).get();
+        const batch = fbDb.batch();
+        debtsSnap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+
+        await logActivityCloud({
+            type: 'breach',
+            title: '⚠️ تصفير شامل للنظام (Full Reset)',
+            details: 'تم تصفير الإيراد اليومي والشهري ومسح سجل الديون بالكامل بأمر المدير العام.',
+            user: 'المدير العام',
+            role: 'admin'
+        });
+
+        return true;
+    }
+
+    // ==================== 6. DEBTS REGISTRY ====================
+    function subscribeDebts(callback) {
+        if (!isCloudReady || !fbDb) return () => {};
+
+        return fbDb.collection(COLL_DEBTS).onSnapshot(
+            snap => {
+                const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+                callback(list);
+            },
+            err => {
+                console.error('❌ subscribeDebts Error:', err);
+            }
+        );
     }
 
     async function addDebtCloud(patientName, patientPhone, remainingAmount) {
+        if (!isCloudReady || !fbDb) throw new Error('الاتصال بقاعدة البيانات غير متوفر!');
+        await ensureAuth();
+
         const id = 'debt_' + Date.now().toString(36);
         const debtRecord = {
             id,
@@ -361,71 +509,78 @@
             createdAt: new Date().toISOString()
         };
 
-        if (isCloudReady && fbDb) {
-            await ensureAuth();
-            await fbDb.collection(COLL_DEBTS).doc(id).set(debtRecord);
-            return debtRecord;
-        }
-
-        const local = JSON.parse(localStorage.getItem('medinexus_debts') || '[]');
-        local.unshift(debtRecord);
-        localStorage.setItem('medinexus_debts', JSON.stringify(local));
+        await fbDb.collection(COLL_DEBTS).doc(id).set(debtRecord);
         return debtRecord;
     }
 
     async function payDebtCloud(id, amountPaid, currentRemaining) {
+        if (!isCloudReady || !fbDb) throw new Error('الاتصال بقاعدة البيانات غير متوفر!');
+        await ensureAuth();
+
         const newRem = Math.max(0, currentRemaining - amountPaid);
         const newStatus = newRem === 0 ? 'paid' : 'partial';
 
-        if (isCloudReady && fbDb) {
-            await ensureAuth();
-            const batch = fbDb.batch();
+        await fbDb.collection(COLL_DEBTS).doc(id).update({
+            remainingAmount: newRem,
+            status: newStatus
+        });
 
-            batch.update(fbDb.collection(COLL_DEBTS).doc(id), {
-                remainingAmount: newRem,
-                status: newStatus
-            });
+        await fbDb.collection(COLL_FINANCES).doc('summary').set({
+            dailyTotal: firebase.firestore.FieldValue.increment(Number(amountPaid) || 0)
+        }, { merge: true });
 
-            // Add collected debt payment to daily revenue
-            const finRef = fbDb.collection(COLL_FINANCES).doc('summary');
-            batch.set(finRef, {
-                dailyTotal: firebase.firestore.FieldValue.increment(Number(amountPaid) || 0)
-            }, { merge: true });
-
-            await batch.commit();
-            return true;
-        }
-
-        const local = JSON.parse(localStorage.getItem('medinexus_debts') || '[]');
-        const d = local.find(x => x.id === id);
-        if (d) {
-            d.remainingAmount = newRem;
-            d.status = newStatus;
-        }
-        localStorage.setItem('medinexus_debts', JSON.stringify(local));
         return true;
     }
 
-    // Public Firebase Engine Interface
+    async function resetAllDebtsCloud() {
+        if (!isCloudReady || !fbDb) throw new Error('الاتصال بقاعدة البيانات غير متوفر!');
+        await ensureAuth();
+
+        const snap = await fbDb.collection(COLL_DEBTS).get();
+        const batch = fbDb.batch();
+        snap.docs.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        await batch.commit();
+
+        await logActivityCloud({
+            type: 'financial',
+            title: 'تصفير سجل الديون بالكامل',
+            details: 'تم مسح وتصفير كافة الديون المترتبة على المرضى.',
+            user: 'المدير العام',
+            role: 'admin'
+        });
+        return true;
+    }
+
+    // Export Firebase API
     window.MedicalFirebase = {
         init: async function () {
             await ensureAuth();
-            await initializeSystemSeed();
+            await verifySeed();
         },
-        isReady: () => isCloudReady,
-        subscribeFinances,
-        transferDailyRevenueCloud,
-        subscribeTreatments,
-        addTreatmentCloud,
-        deleteTreatmentCloud,
+        verifyDoctorCredentials,
         subscribeDoctors,
         addDoctorCloud,
+        deleteDoctorCloud,
         toggleDoctorSessionStatus,
+        subscribeTreatments,
+        addTreatmentCloud,
+        updateTreatmentCloud,
+        deleteTreatmentCloud,
         subscribeSessions,
         recordPatientSessionCloud,
+        deleteSessionCloud,
+        subscribeConsumedLogs,
+        subscribeActivities,
+        logActivityCloud,
+        subscribeFinances,
+        transferDailyRevenueCloud,
+        fullSystemResetCloud,
         subscribeDebts,
         addDebtCloud,
         payDebtCloud,
+        resetAllDebtsCloud,
         updateStatusIndicator
     };
 })();

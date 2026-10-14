@@ -1,11 +1,11 @@
 /* ==================================================================
-   MEDINEXUS PRO — Master Clinic Control Engine & Doctor Portal
+   MEDINEXUS PRO — Master Clinic Control Engine & Operations
    ================================================================== */
 
 (function () {
     'use strict';
 
-    // Core DOM Helpers & Formatters
+    // Core Utilities
     const $ = selector => document.querySelector(selector);
     const $$ = selector => document.querySelectorAll(selector);
     const fmt = n => new Intl.NumberFormat('en-US').format(Math.round(n || 0));
@@ -22,21 +22,23 @@
         })[m]);
     }
 
-    // Master System In-Memory Cache
+    // Master System State
     const State = {
-        portalMode: 'admin', // 'admin' | 'doctor'
+        currentUser: null,    // { role: 'admin'|'doctor', name, username, phone, uid }
+        portalMode: 'admin',  // 'admin' | 'doctor'
         activeAdminView: 'admin-dashboard',
-        currentDoctor: null,  // Logged-in doctor object
+        activityFilter: 'all', // 'all' | 'breach' | 'session'
         finances: { dailyTotal: 0, monthlyTotal: 0 },
         doctors: [],
         treatments: [],
         sessions: [],
         debts: [],
-        generatedMessage: ''
+        activities: [],
+        consumedLogs: []
     };
 
-    // ==================== TOAST NOTIFICATION DISPATCHER ====================
-    function toast(msg, type = 'info', duration = 3000) {
+    // ==================== TOAST NOTIFICATIONS ====================
+    function toast(msg, type = 'info', duration = 3500) {
         try {
             const wrap = $('#toast-wrap');
             if (!wrap) return;
@@ -112,45 +114,110 @@
         $('#drawer-overlay')?.classList.remove('show');
     }
 
-    // ==================== PORTAL & VIEW SWITCHING ====================
-    function togglePortalMode() {
-        if (State.portalMode === 'admin') {
-            setPortalMode('doctor');
-        } else {
-            setPortalMode('admin');
+    // Context for security.js
+    function getCurrentUserContext() {
+        if (State.currentUser) return State.currentUser;
+        return { name: 'زائر / شاشة الدخول', role: 'guest', username: 'guest' };
+    }
+
+    function showSecurityWarning(type) {
+        toast(`⚠️ تنبيه أمني: تم رصد ومنع [${type}] وتسجيل المحاولة في سجل الحركات!`, 'error', 4500);
+    }
+
+    // ==================== 1. GLOBAL LOGIN GATEWAY ====================
+    async function handleGlobalLogin() {
+        const username = $('#login-username').value.trim();
+        const password = $('#login-password').value.trim();
+        const submitBtn = $('#btn-login-submit');
+
+        if (!username || !password) {
+            toast('يرجى إدخال اسم المستخدم وكلمة المرور', 'error');
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'جارِ التحقق من السحابة...';
+
+        try {
+            // A. Master Admin Check
+            if (username === 'abbbas111' && password === 'QWERT') {
+                State.currentUser = { role: 'admin', name: 'المدير العام', username: 'abbbas111' };
+                localStorage.setItem('medinexus_session', JSON.stringify(State.currentUser));
+                enterAppSession('admin');
+                toast('مرحباً بك أيها المدير العام (Master Admin) 👋', 'success');
+                return;
+            }
+
+            // B. Doctor Check in Firestore
+            const doctorData = await window.MedicalFirebase.verifyDoctorCredentials(username, password);
+            State.currentUser = {
+                role: 'doctor',
+                uid: doctorData.uid,
+                name: doctorData.name,
+                username: doctorData.username,
+                phone: doctorData.phone,
+                isActive: doctorData.isActive
+            };
+
+            localStorage.setItem('medinexus_session', JSON.stringify(State.currentUser));
+            enterAppSession('doctor');
+            toast(`أهلاً بك دكتور ${doctorData.name} 👋`, 'success');
+
+        } catch (err) {
+            toast(err.message || 'بيانات الدخول غير صحيحة!', 'error', 4000);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'دخول إلى النظام';
         }
     }
 
-    function setPortalMode(mode) {
-        State.portalMode = mode;
-        if (mode === 'admin') {
+    function enterAppSession(role) {
+        $('#global-login-gate').style.display = 'none';
+        $('#app-shell').classList.remove('hidden');
+
+        if (role === 'admin') {
+            State.portalMode = 'admin';
             $('#section-admin-portal').classList.add('active');
             $('#section-doctor-portal').classList.remove('active');
             $('#header-role-badge').textContent = 'لوحة الإدارة';
             $('#header-role-badge').className = 'badge badge-cyan text-[10px] py-0.5 px-2';
-            $('#btn-portal-icon').textContent = '📱';
-            $('#btn-portal-text').textContent = 'بوابة الطبيب';
             $('#btn-header-label').textContent = 'إضافة طبيب';
             $('#btn-hamburger').style.display = 'flex';
             $('#session-user-display').textContent = 'المستخدم: المدير العام';
-            closeDrawer();
+            switchAdminView(State.activeAdminView || 'admin-dashboard');
         } else {
+            State.portalMode = 'doctor';
             $('#section-admin-portal').classList.remove('active');
             $('#section-doctor-portal').classList.add('active');
             $('#header-role-badge').textContent = 'بوابة الطبيب';
             $('#header-role-badge').className = 'badge badge-emerald text-[10px] py-0.5 px-2';
-            $('#btn-portal-icon').textContent = '💻';
-            $('#btn-portal-text').textContent = 'لوحة الإدارة';
             $('#btn-header-label').textContent = 'إضافة مراجع';
             $('#btn-hamburger').style.display = 'none';
-            closeDrawer();
+            $('#session-user-display').textContent = `د. ${State.currentUser.name}`;
 
-            // Check if doctor logged in
-            if (State.currentDoctor) {
-                showDoctorDashboard();
-            } else {
-                showDoctorLogin();
-            }
+            $('#doc-active-name').textContent = State.currentUser.name;
+            $('#doc-active-phone').textContent = `هاتف: ${State.currentUser.phone} (@${State.currentUser.username})`;
+            renderDoctorDashboard();
+        }
+    }
+
+    function handleGlobalLogout() {
+        if (!confirm('هل ترغب بتسجيل الخروج من النظام؟')) return;
+        State.currentUser = null;
+        localStorage.removeItem('medinexus_session');
+        $('#login-username').value = '';
+        $('#login-password').value = '';
+        $('#app-shell').classList.add('hidden');
+        $('#global-login-gate').style.display = 'flex';
+        closeDrawer();
+        toast('تم تسجيل الخروج بنجاح', 'info');
+    }
+
+    function headerQuickAction() {
+        if (State.portalMode === 'admin') {
+            openAddDoctorModal();
+        } else {
+            openAddPatientFullScreen();
         }
     }
 
@@ -168,30 +235,18 @@
         window.scrollTo({ top: 0, behavior: 'instant' });
     }
 
-    function headerQuickAction() {
-        if (State.portalMode === 'admin') {
-            openAddDoctorModal();
-        } else {
-            if (State.currentDoctor) {
-                openAddPatientFullScreen();
-            } else {
-                toast('يرجى تسجيل الدخول كطبيب أولاً', 'warn');
-            }
-        }
-    }
-
-    // ==================== 1. ADMIN MODULE: FINANCES & SETTLEMENT ====================
+    // ==================== 2. MAIN FINANCIAL DASHBOARD & RESETS ====================
     function renderFinances() {
         const daily = Number(State.finances.dailyTotal) || 0;
         const monthly = Number(State.finances.monthlyTotal) || 0;
-        const totalDebts = State.debts.reduce((sum, d) => sum + (Number(d.remainingAmount) || 0), 0);
+        const activeDocsCount = State.doctors.filter(d => d.isActive !== false).length;
 
         $('#stat-daily-rev').textContent = fmt(daily);
         $('#stat-monthly-rev').textContent = fmt(monthly);
-        $('#stat-debts-total').textContent = fmt(totalDebts);
+        $('#stat-active-doctors-count').textContent = activeDocsCount;
     }
 
-    // زر الترحيل اليومي: نقل إيراد اليوم للشهري وتصفير اليوم
+    // زر 1: تصفير إيراد اليوم وتحويله للتراكمي
     async function transferDailyRevenue() {
         const daily = Number(State.finances.dailyTotal) || 0;
         if (daily <= 0) {
@@ -200,20 +255,58 @@
         }
 
         const ok = await DialogEngine.confirm(
-            `هل تريد بالتأكيد إجراء الترحيل اليومي؟\nسيتم نقل مبلغ (${fmt(daily)} IQD) إلى الإيراد الشهري وتصفير رصيد اليوم ليبدأ يوماً جديداً.`,
-            'الترحيل المالي اليومي'
+            `هل تريد بالتأكيد ترحيل مبلغ اليوم (${fmt(daily)} IQD) إلى الإيراد التراكمي وتصفير رصيد اليوم؟`,
+            'ترحيل إيراد اليوم'
         );
         if (!ok) return;
 
         try {
             await window.MedicalFirebase.transferDailyRevenueCloud(daily, State.finances.monthlyTotal);
-            toast('تم إجراء الترحيل اليومي وتصفير رصيد اليوم بنجاح ✓', 'success');
+            toast('تم إجراء الترحيل وتصفير إيراد اليوم بنجاح ✓', 'success');
         } catch (e) {
-            toast('حدث خطأ أثناء ترحيل الإيرادات', 'error');
+            toast('حدث خطأ أثناء الترحيل: ' + e.message, 'error');
         }
     }
 
-    // ==================== 2. ADMIN MODULE: DOCTOR CONTROL CENTER ====================
+    // زر 2: تصفير الدين بالكامل
+    async function resetDebtsOnly() {
+        const totalDebts = State.debts.reduce((sum, d) => sum + (Number(d.remainingAmount) || 0), 0);
+        if (totalDebts <= 0 && State.debts.length === 0) {
+            toast('سجل الديون فارغ بالفعل ولا توجد ديون لتصفيرها', 'warn');
+            return;
+        }
+
+        const ok = await DialogEngine.confirm(
+            `هل أنت متأكد من تصفير ومسح كافة الديون المسجلة البالغة (${fmt(totalDebts)} IQD) بالكامل؟`,
+            'تصفير الدين'
+        );
+        if (!ok) return;
+
+        try {
+            await window.MedicalFirebase.resetAllDebtsCloud();
+            toast('تم تصفير ومسح سجل الديون بالكامل بنجاح ✓', 'success');
+        } catch (e) {
+            toast('فشل تصفير الديون: ' + e.message, 'error');
+        }
+    }
+
+    // زر 3: تصفير كامل للنظام
+    async function fullSystemReset() {
+        const ok = await DialogEngine.confirm(
+            '⚠️ تحذير شديد الخطورة:\nسيؤدي هذا الإجراء إلى تصفير إيراد اليوم، الإيراد التراكمي، وسجل الديون إلى صفر (0).\n\nهل تؤكد تصفير كامل النظام؟',
+            'تصفير كامل للنظام'
+        );
+        if (!ok) return;
+
+        try {
+            await window.MedicalFirebase.fullSystemResetCloud();
+            toast('تم إجراء تصفير شامل للأرصدة والديون في النظام ✓', 'warn');
+        } catch (e) {
+            toast('فشل تصفير النظام: ' + e.message, 'error');
+        }
+    }
+
+    // ==================== 3. DOCTORS MANAGEMENT & DETAILED PROFILE ====================
     function renderDoctors() {
         const grid = $('#doctors-cards-grid');
         const quickGrid = $('#quick-doctors-grid');
@@ -233,7 +326,6 @@
             return;
         }
 
-        // Render Doctor Cards with Kill/Freeze Switch & Today's Revenue
         grid.innerHTML = State.doctors.map(doc => {
             const docSessionsToday = getDoctorTodaySessions(doc.uid);
             const todayRev = docSessionsToday.reduce((sum, s) => sum + (Number(s.finalPrice) || 0), 0);
@@ -242,30 +334,35 @@
             return `
                 <div class="doctor-item-card ${!isActive ? 'frozen' : ''}" id="doc-card-${doc.uid}">
                     <div class="flex items-start justify-between mb-4">
-                        <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-3 cursor-pointer" onclick="window.ClinicEngine.openDoctorDetailsModal('${doc.uid}')">
                             <div class="w-12 h-12 rounded-2xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-2xl shadow-lg">
                                 👨‍⚕️
                             </div>
                             <div>
-                                <h4 class="font-bold text-white text-base font-tajawal">${escapeHtml(doc.name)}</h4>
+                                <h4 class="font-bold text-white text-base font-tajawal hover:text-cyan-400 transition-colors">${escapeHtml(doc.name)}</h4>
                                 <div class="flex items-center gap-2 mt-1">
                                     <span class="text-xs text-cyan-400 font-mono">@${escapeHtml(doc.username)}</span>
                                     <span class="badge ${isActive ? 'badge-emerald' : 'badge-pink'} text-[9px]">
-                                        ${isActive ? '● الجلسة نشطة' : '❄️ مجمد / مقفل'}
+                                        ${isActive ? '● نشط' : '❄️ مجمد'}
                                     </span>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Session Kill / Freeze Switch (زر إيقاف الجلسة) -->
-                        <div class="switch-container" title="${isActive ? 'إيقاف / تجميد الجلسة' : 'استئناف وتفعيل الجلسة'}" onclick="window.ClinicEngine.toggleDoctorFreeze('${doc.uid}', ${isActive})">
-                            <div class="switch-track ${isActive ? 'active' : ''}">
-                                <div class="switch-thumb"></div>
+                        <!-- Actions: Freeze switch & Delete Trash Button -->
+                        <div class="flex items-center gap-2">
+                            <div class="switch-container" title="${isActive ? 'إيقاف / تجميد الجلسة' : 'استئناف وتفعيل الجلسة'}" onclick="window.ClinicEngine.toggleDoctorFreeze('${doc.uid}', ${isActive})">
+                                <div class="switch-track ${isActive ? 'active' : ''}">
+                                    <div class="switch-thumb"></div>
+                                </div>
                             </div>
+                            <button class="btn-delete-doc" title="حذف الطبيب نهائياً" onclick="window.ClinicEngine.deleteDoctor('${doc.uid}', '${escapeHtml(doc.name)}')">
+                                🗑️
+                            </button>
                         </div>
                     </div>
 
-                    <div class="p-3.5 rounded-xl bg-black/40 border border-white/5 mb-4 grid grid-cols-2 gap-2 font-mono text-xs">
+                    <div class="p-3.5 rounded-xl bg-black/40 border border-white/5 mb-4 grid grid-cols-2 gap-2 font-mono text-xs cursor-pointer" onclick="window.ClinicEngine.openDoctorDetailsModal('${doc.uid}')">
                         <div>
                             <span class="text-gray-400 text-[10px] block">إيراد الطبيب اليوم:</span>
                             <span class="font-bold text-emerald-400 text-sm">${fmt(todayRev)} IQD</span>
@@ -279,14 +376,13 @@
                     <div class="flex items-center justify-between pt-2 border-t border-white/10 text-xs">
                         <span class="text-gray-400 font-mono">${escapeHtml(doc.phone || '—')}</span>
                         <button class="btn btn-ghost py-1.5 px-3 text-xs text-cyan-400" onclick="window.ClinicEngine.openDoctorDetailsModal('${doc.uid}')">
-                            عرض قائمة المرضى (${docSessionsToday.length}) ←
+                            عرض الملف الشخصي والمواعيد ←
                         </button>
                     </div>
                 </div>
             `;
         }).join('');
 
-        // Quick Grid in Dashboard
         if (quickGrid) {
             quickGrid.innerHTML = State.doctors.slice(0, 3).map(doc => {
                 const docSessionsToday = getDoctorTodaySessions(doc.uid);
@@ -317,53 +413,98 @@
         });
     }
 
-    // Toggle Freeze / Session Kill Switch
+    async function deleteDoctor(doctorId, doctorName) {
+        const ok = await DialogEngine.confirm(
+            `⚠️ هل أنت متأكد تماماً من حذف الطبيب "${doctorName}" وسحب كافة صلاحياته وحذف حسابه نهائياً من النظام؟`,
+            'حذف طبيب'
+        );
+        if (!ok) return;
+
+        try {
+            await window.MedicalFirebase.deleteDoctorCloud(doctorId, doctorName);
+            toast(`تم حذف حساب الطبيب "${doctorName}" بنجاح ✓`, 'warn');
+        } catch (e) {
+            toast('تعذر حذف الطبيب: ' + e.message, 'error');
+        }
+    }
+
     async function toggleDoctorFreeze(doctorId, currentStatus) {
         const targetDoc = State.doctors.find(d => d.uid === doctorId || d.id === doctorId);
         if (!targetDoc) return;
 
         const actionText = currentStatus ? 'تجميد وإيقاف جلسة' : 'إعادة تفعيل جلسة';
-        const ok = await DialogEngine.confirm(
-            `هل تؤكد ${actionText} الطبيب "${targetDoc.name}"؟\n${currentStatus ? 'سيتم حظر تسجيل دخوله ومنعه من حفظ الجلسات فوراً.' : 'سيتم السماح له بتسجيل الدخول والعمل مجدداً.'}`,
-            'مفتاح إيقاف الجلسة (Session Freeze Switch)'
-        );
+        const ok = await DialogEngine.confirm(`هل تؤكد ${actionText} الطبيب "${targetDoc.name}"؟`, 'حالة الجلسة');
         if (!ok) return;
 
         try {
             await window.MedicalFirebase.toggleDoctorSessionStatus(doctorId, currentStatus);
-            toast(`تم ${currentStatus ? 'تجميد جلسة' : 'تفعيل'} الطبيب بنجاح`, currentStatus ? 'warn' : 'success');
+            toast(`تم ${currentStatus ? 'تجميد جلسة' : 'تفعيل'} الطبيب بنجاح ✓`, currentStatus ? 'warn' : 'success');
         } catch (e) {
-            toast('تعذر تحديث حالة الطبيب', 'error');
+            toast('تعذر تحديث حالة الطبيب: ' + e.message, 'error');
         }
     }
 
-    // Open Doctor Details Modal with Patient History
+    // Modal: Detailed Doctor Profile (Image 3 requirements)
     function openDoctorDetailsModal(doctorId) {
         const doc = State.doctors.find(d => d.uid === doctorId || d.id === doctorId);
         if (!doc) return;
 
-        const docSessions = State.sessions.filter(s => s.doctorId === doctorId);
+        const allDocSessions = State.sessions.filter(s => s.doctorId === doctorId);
         const todaySessions = getDoctorTodaySessions(doctorId);
         const todayRev = todaySessions.reduce((sum, s) => sum + (Number(s.finalPrice) || 0), 0);
 
         $('#modal-doc-title-name').textContent = doc.name;
-        $('#modal-doc-title-user').textContent = `اسم المستخدم: ${doc.username} • هاتف: ${doc.phone}`;
+        $('#modal-doc-title-user').textContent = `اسم المستخدم: @${doc.username} • الهاتف: ${doc.phone}`;
         $('#modal-doc-today-rev').textContent = `${fmt(todayRev)} IQD`;
 
-        const listEl = $('#modal-doc-patients-list');
-        if (docSessions.length === 0) {
-            listEl.innerHTML = `<div class="p-6 text-center text-gray-500 text-xs">لم يقم هذا الطبيب بتسجيل أي جلسات بعد.</div>`;
+        // 1. List of Treatments/Medicines used by this doctor today
+        const treatmentsUsedEl = $('#modal-doc-treatments-used');
+        if (todaySessions.length === 0) {
+            treatmentsUsedEl.innerHTML = `<span class="text-gray-500">لا توجد مواد مستخدمة اليوم</span>`;
         } else {
-            listEl.innerHTML = docSessions.map(s => `
-                <div class="p-3.5 rounded-xl bg-black/40 border border-white/5 flex items-center justify-between text-xs">
+            const trtCountMap = {};
+            todaySessions.forEach(s => {
+                const name = s.treatmentName || 'علاج عام';
+                trtCountMap[name] = (trtCountMap[name] || 0) + 1;
+            });
+            treatmentsUsedEl.innerHTML = Object.entries(trtCountMap).map(([name, count]) => `
+                <div class="flex items-center justify-between p-2 rounded-lg bg-black/30 border border-white/5">
+                    <span class="text-gray-200 font-bold">${escapeHtml(name)}</span>
+                    <span class="badge badge-cyan text-[10px]">${count} مرات</span>
+                </div>
+            `).join('');
+        }
+
+        // 2. List of Today's Patients
+        const patientsTodayEl = $('#modal-doc-patients-today');
+        if (todaySessions.length === 0) {
+            patientsTodayEl.innerHTML = `<span class="text-gray-500">لا يوجد مرضى مسجلين اليوم</span>`;
+        } else {
+            patientsTodayEl.innerHTML = todaySessions.map(s => `
+                <div class="flex items-center justify-between p-2 rounded-lg bg-black/30 border border-white/5">
                     <div>
-                        <div class="font-bold text-white text-sm">${escapeHtml(s.patientName)}</div>
-                        <div class="text-[11px] text-gray-400 mt-0.5">العلاج: ${escapeHtml(s.treatmentName)} • هاتف: ${escapeHtml(s.patientPhone)}</div>
-                        <div class="text-[10px] text-cyan-400/80 font-mono mt-1">تاريخ الجلسة: ${formatDate(s.createdAt)}</div>
+                        <span class="font-bold text-white block">${escapeHtml(s.patientName)}</span>
+                        <span class="text-[10px] text-gray-400 font-mono">${escapeHtml(s.patientPhone)}</span>
                     </div>
-                    <div class="text-left font-mono">
-                        <div class="font-black text-emerald-400 text-sm">${fmt(s.finalPrice)} IQD</div>
-                        <div class="text-[10px] text-gray-400">الجلسة 2: ${formatDate(s.session2Date)}</div>
+                    <span class="text-emerald-400 font-mono font-bold">${fmt(s.finalPrice)} IQD</span>
+                </div>
+            `).join('');
+        }
+
+        // 3. Previous and Upcoming Appointment Schedules
+        const apptsEl = $('#modal-doc-appointments-list');
+        if (allDocSessions.length === 0) {
+            apptsEl.innerHTML = `<div class="p-4 text-center text-gray-500">لا توجد مواعيد مسجلة</div>`;
+        } else {
+            apptsEl.innerHTML = allDocSessions.map(s => `
+                <div class="p-2.5 rounded-lg bg-black/30 border border-white/5 flex items-center justify-between">
+                    <div>
+                        <span class="font-bold text-white">${escapeHtml(s.patientName)}</span>
+                        <span class="text-[10px] text-cyan-400 block">العلاج: ${escapeHtml(s.treatmentName)}</span>
+                    </div>
+                    <div class="text-left font-mono text-[10px]">
+                        <span class="text-gray-400 block">الجلسة 1: ${formatDate(s.createdAt)}</span>
+                        <span class="text-fuchsia-400 font-bold block">الجلسة 2 القادمة: ${formatDate(s.session2Date)}</span>
                     </div>
                 </div>
             `).join('');
@@ -397,36 +538,45 @@
             closeModal('modal-add-doctor');
             toast(`تم إنشاء وتفعيل حساب الطبيب "${name}" بنجاح ✓`, 'success');
         } catch (err) {
-            toast(err.message || 'حدث خطأ أثناء إنشاء حساب الطبيب', 'error');
+            toast(err.message || 'حدث خطأ أثناء حفظ الطبيب', 'error');
         }
     }
 
-    // ==================== 3. ADMIN MODULE: TREATMENTS CATALOG ====================
+    // ==================== 4. CENTRAL TREATMENTS CATALOG & PRICE EDITING ====================
     function renderTreatments() {
         const tbody = $('#treatments-table-body');
         const select = $('#pt-treatment-select');
 
-        // 1. Update Table in Admin
+        // 1. Render Admin Catalog Table
         if (tbody) {
             if (State.treatments.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-gray-500">لا توجد علاجات في الكتالوج المركزي</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500">لا توجد علاجات في الكتالوج المركزي</td></tr>`;
             } else {
-                tbody.innerHTML = State.treatments.map(t => `
-                    <tr class="hover:bg-cyan-500/5 transition-colors">
-                        <td class="p-4 font-bold text-white text-sm">${escapeHtml(t.name)}</td>
-                        <td class="p-4 font-mono font-bold text-emerald-400">${fmt(t.defaultPrice)} IQD</td>
-                        <td class="p-4 text-gray-400 font-mono text-[11px]">${formatDate(t.createdAt)}</td>
-                        <td class="p-4 text-center">
-                            <button class="btn btn-ghost py-1 px-2.5 text-xs text-pink-500 border-pink-500/30" onclick="window.ClinicEngine.deleteTreatment('${t.id}')">
-                                🗑 حذف
-                            </button>
-                        </td>
-                    </tr>
-                `).join('');
+                tbody.innerHTML = State.treatments.map(t => {
+                    const stock = Number(t.stock) || 50;
+                    return `
+                        <tr class="hover:bg-cyan-500/5 transition-colors">
+                            <td class="p-4 font-bold text-white text-sm">${escapeHtml(t.name)}</td>
+                            <td class="p-4 font-mono font-bold text-emerald-400">${fmt(t.defaultPrice)} IQD</td>
+                            <td class="p-4 font-mono text-amber-400 font-bold">${stock} وحدة</td>
+                            <td class="p-4 text-gray-400 font-mono text-[11px]">${formatDate(t.createdAt)}</td>
+                            <td class="p-4 text-center">
+                                <div class="flex items-center justify-center gap-1.5">
+                                    <button class="btn btn-ghost py-1 px-2.5 text-xs text-cyan-400" title="تعديل السعر والمخزون" onclick="window.ClinicEngine.openEditTreatmentModal('${t.id}')">
+                                        ✎ تعديل
+                                    </button>
+                                    <button class="btn btn-ghost py-1 px-2 text-xs text-pink-500 border-pink-500/30" title="حذف" onclick="window.ClinicEngine.deleteTreatment('${t.id}')">
+                                        🗑
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
             }
         }
 
-        // 2. Real-Time Auto Sync to Doctor Mobile Dropdown!
+        // 2. Real-Time Sync to Doctor Mobile Dropdown
         if (select) {
             const currentSelected = select.value;
             select.innerHTML = '<option value="">-- اختر نوع العلاج من الكتالوج المركزي --</option>' +
@@ -436,11 +586,15 @@
                     </option>
                 `).join('');
         }
+
+        // Also refresh consumed products section
+        renderConsumedProducts();
     }
 
     function openAddTreatmentModal() {
         $('#new-trt-name').value = '';
         $('#new-trt-price').value = '';
+        $('#new-trt-stock').value = '50';
         openModal('modal-add-treatment');
         setTimeout(() => $('#new-trt-name').focus(), 150);
     }
@@ -448,6 +602,7 @@
     async function confirmCreateTreatment() {
         const name = $('#new-trt-name').value.trim();
         const price = Number($('#new-trt-price').value) || 0;
+        const stock = Number($('#new-trt-stock').value) || 50;
 
         if (!name) {
             toast('أدخل اسم العلاج أولاً', 'error');
@@ -455,11 +610,43 @@
         }
 
         try {
-            await window.MedicalFirebase.addTreatmentCloud(name, price);
+            await window.MedicalFirebase.addTreatmentCloud(name, price, stock);
             closeModal('modal-add-treatment');
-            toast(`تمت إضافة علاج "${name}" وسيتزامن فوراً مع هواتف الأطباء ✓`, 'success');
+            toast(`تمت إضافة علاج "${name}" بنجاح وتحديث هواتف الأطباء فورياً ✓`, 'success');
         } catch (e) {
-            toast('تعذر إضافة العلاج', 'error');
+            toast('تعذر إضافة العلاج: ' + e.message, 'error');
+        }
+    }
+
+    function openEditTreatmentModal(id) {
+        const trt = State.treatments.find(t => t.id === id);
+        if (!trt) return;
+
+        $('#edit-trt-id').value = trt.id;
+        $('#edit-trt-name').value = trt.name;
+        $('#edit-trt-price').value = trt.defaultPrice;
+        $('#edit-trt-stock').value = trt.stock || 50;
+
+        openModal('modal-edit-treatment');
+    }
+
+    async function confirmUpdateTreatment() {
+        const id = $('#edit-trt-id').value;
+        const name = $('#edit-trt-name').value.trim();
+        const price = Number($('#edit-trt-price').value) || 0;
+        const stock = Number($('#edit-trt-stock').value) || 0;
+
+        if (!name) {
+            toast('اسم العلاج مطلوب', 'error');
+            return;
+        }
+
+        try {
+            await window.MedicalFirebase.updateTreatmentCloud(id, name, price, stock);
+            closeModal('modal-edit-treatment');
+            toast(`تم تعديل سعر ومخزون العلاج "${name}" وتحديث كافة الحسابات تلقائياً ✓`, 'success');
+        } catch (e) {
+            toast('فشل التعديل: ' + e.message, 'error');
         }
     }
 
@@ -467,86 +654,297 @@
         const trt = State.treatments.find(t => t.id === id);
         if (!trt) return;
 
-        const ok = await DialogEngine.confirm(`هل أنت متأكد من حذف علاج "${trt.name}" من الكتالوج المركزي؟`, 'حذف علاج');
+        const ok = await DialogEngine.confirm(`هل أنت متأكد من حذف علاج "${trt.name}"؟`, 'حذف علاج');
         if (!ok) return;
 
         try {
             await window.MedicalFirebase.deleteTreatmentCloud(id);
             toast('تم حذف العلاج من الكتالوج', 'warn');
         } catch (e) {
-            toast('تعذر حذف العلاج', 'error');
+            toast('تعذر حذف العلاج: ' + e.message, 'error');
         }
     }
 
-    // ==================== 4. ADMIN MODULE: DEBTS REGISTRY ====================
-    function renderDebts(filterQuery = '') {
-        const tbody = $('#debts-table-body');
-        const fullContainer = $('#full-debts-container');
+    // ==================== 5. CONSUMED PRODUCTS SECTION ====================
+    function renderConsumedProducts() {
+        const tbody = $('#consumed-products-table-body');
         if (!tbody) return;
 
-        let list = State.debts.slice();
-        if (filterQuery) {
-            const q = filterQuery.toLowerCase().trim();
-            list = list.filter(d => (d.patientName || '').toLowerCase().includes(q) || (d.patientPhone || '').includes(q));
-        }
-
-        if (list.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-gray-500 font-tajawal">سجل الديون خالي تماماً ✓</td></tr>`;
-            if (fullContainer) fullContainer.innerHTML = `<div class="p-8 text-center text-gray-500">لا توجد ديون مسجلة</div>`;
+        if (State.treatments.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500">لا توجد مواد مضافة في المخزون</td></tr>`;
             return;
         }
 
-        const html = list.map(d => {
-            const rem = Number(d.remainingAmount) || 0;
-            const isPaid = rem <= 0;
+        tbody.innerHTML = State.treatments.map(t => {
+            const totalStock = Number(t.stock) || 50;
+            const consumed = Number(t.consumed) || 0;
+            const remaining = Math.max(0, totalStock - consumed);
+            const percent = totalStock > 0 ? Math.min(100, Math.round((consumed / totalStock) * 100)) : 0;
+
             return `
-                <tr class="hover:bg-cyan-500/5 transition-colors">
-                    <td class="p-3.5 font-bold text-white text-sm">${escapeHtml(d.patientName)}</td>
-                    <td class="p-3.5 font-mono text-cyan-300 text-xs">${escapeHtml(d.patientPhone || '—')}</td>
-                    <td class="p-3.5 font-mono font-black ${isPaid ? 'text-emerald-400' : 'text-pink-500'} text-sm">${fmt(rem)} IQD</td>
-                    <td class="p-3.5 text-gray-400 font-mono text-[11px]">${formatDate(d.createdAt)}</td>
-                    <td class="p-3.5">
-                        <span class="badge ${isPaid ? 'badge-emerald' : 'badge-pink'} text-[10px]">
-                            ${isPaid ? '✓ مسدد بالكامل' : 'مستحق'}
-                        </span>
+                <tr class="hover:bg-amber-500/5 transition-colors">
+                    <td class="p-4 font-bold text-white text-sm">${escapeHtml(t.name)}</td>
+                    <td class="p-4 font-mono font-bold text-white">${totalStock} وحدة</td>
+                    <td class="p-4 font-mono font-bold text-amber-400">
+                        ${consumed} وحدة (${percent}%)
+                        <div class="stock-bar-wrap">
+                            <div class="stock-bar-fill" style="width: ${percent}%"></div>
+                        </div>
                     </td>
-                    <td class="p-3.5 text-center">
-                        ${!isPaid ? `
-                            <button class="btn btn-success py-1 px-3 text-xs" onclick="window.ClinicEngine.openPayDebtPrompt('${d.id}', ${rem})">
-                                💵 تسديد
-                            </button>
-                        ` : `
-                            <span class="text-emerald-400 text-xs font-bold font-tajawal">منتهي</span>
-                        `}
+                    <td class="p-4 font-mono font-bold ${remaining <= 5 ? 'text-pink-500 animate-pulse' : 'text-emerald-400'}">
+                        ${remaining} وحدة
+                    </td>
+                    <td class="p-4 text-center">
+                        <button class="btn btn-ghost py-1 px-3 text-xs text-amber-400 border-amber-500/30" onclick="window.ClinicEngine.openConsumedDetails('${t.id}', '${escapeHtml(t.name)}')">
+                            🔍 تفاصيل الاستهلاك
+                        </button>
                     </td>
                 </tr>
             `;
         }).join('');
+    }
 
-        tbody.innerHTML = html;
-        if (fullContainer) {
-            fullContainer.innerHTML = `
-                <div class="overflow-x-auto no-scrollbar">
-                    <table class="w-full text-right text-xs">
-                        <thead class="bg-black/40 border-b border-cyan-500/20 text-cyan-400 font-mono">
-                            <tr>
-                                <th class="p-3.5">اسم المريض</th>
-                                <th class="p-3.5">الهاتف</th>
-                                <th class="p-3.5">المتبقي</th>
-                                <th class="p-3.5">تاريخ القيد</th>
-                                <th class="p-3.5">الحالة</th>
-                                <th class="p-3.5 text-center">إجراء</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-white/5 font-tajawal">${html}</tbody>
-                    </table>
+    function openConsumedDetails(treatmentId, treatmentName) {
+        $('#modal-consumed-title').textContent = `سجل استهلاك: ${treatmentName}`;
+        const container = $('#modal-consumed-logs-list');
+
+        const logs = State.consumedLogs.filter(l => l.treatmentId === treatmentId || l.treatmentName === treatmentName);
+        if (logs.length === 0) {
+            container.innerHTML = `<div class="p-6 text-center text-gray-500">لم يتم استهلاك هذه المادة بعد أو لا توجد سجلات.</div>`;
+        } else {
+            container.innerHTML = logs.map(l => `
+                <div class="p-3 rounded-xl bg-black/40 border border-white/5 flex items-center justify-between text-xs">
+                    <div>
+                        <span class="font-bold text-white block">د. ${escapeHtml(l.doctorName || 'طبيب')}</span>
+                        <span class="text-gray-400 text-[11px]">المراجع: ${escapeHtml(l.patientName || 'مراجع')}</span>
+                    </div>
+                    <div class="text-left font-mono">
+                        <span class="badge badge-amber text-[10px]">استهلاك: ${l.qty || 1} وحدة</span>
+                        <span class="text-[10px] text-gray-400 block mt-1">${formatDate(l.timestamp)}</span>
+                    </div>
                 </div>
-            `;
+            `).join('');
+        }
+
+        openModal('modal-consumed-details');
+    }
+
+    // ==================== 6. PATIENT REGISTRY SECTION ====================
+    function renderPatientsRegistry(query = '') {
+        const container = $('#patients-registry-grid');
+        if (!container) return;
+
+        // Group sessions by patient Phone or Name
+        const patientsMap = {};
+        State.sessions.forEach(s => {
+            const key = (s.patientPhone || s.patientName || '').trim();
+            if (!key) return;
+
+            if (!patientsMap[key]) {
+                patientsMap[key] = {
+                    name: s.patientName,
+                    phone: s.patientPhone,
+                    doctor: s.doctorName,
+                    treatment: s.treatmentName,
+                    lastDate: s.createdAt,
+                    nextDate: s.session2Date,
+                    totalSpent: 0,
+                    sessionsCount: 0
+                };
+            }
+
+            patientsMap[key].totalSpent += Number(s.finalPrice) || 0;
+            patientsMap[key].sessionsCount += 1;
+            if (new Date(s.createdAt) > new Date(patientsMap[key].lastDate)) {
+                patientsMap[key].lastDate = s.createdAt;
+                patientsMap[key].nextDate = s.session2Date;
+                patientsMap[key].doctor = s.doctorName;
+                patientsMap[key].treatment = s.treatmentName;
+            }
+        });
+
+        let list = Object.values(patientsMap);
+        if (query) {
+            const q = query.toLowerCase().trim();
+            list = list.filter(p => (p.name || '').toLowerCase().includes(q) || (p.phone || '').includes(q));
+        }
+
+        if (list.length === 0) {
+            container.innerHTML = `<div class="p-8 text-center text-gray-500 col-span-full">لا يوجد مرضى مطابقين لنتائج البحث</div>`;
+            return;
+        }
+
+        container.innerHTML = list.map(p => `
+            <div class="patient-card">
+                <div class="flex items-start justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-xl">👤</div>
+                        <div>
+                            <h4 class="font-bold text-white text-sm font-tajawal">${escapeHtml(p.name)}</h4>
+                            <span class="text-xs text-cyan-400 font-mono">${escapeHtml(p.phone)}</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-ghost py-1 px-2.5 text-xs text-emerald-400 border-emerald-500/30" title="مراسلة واتساب" onclick="window.ClinicEngine.quickWhatsAppPatient('${escapeHtml(p.phone)}', '${escapeHtml(p.name)}')">
+                        💬 واتساب
+                    </button>
+                </div>
+
+                <div class="space-y-1.5 text-xs text-gray-300 font-tajawal mb-3 pt-2 border-t border-white/5">
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">آخر علاج:</span>
+                        <span class="font-bold text-white">${escapeHtml(p.treatment)}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">الطبيب المعالج:</span>
+                        <span class="text-cyan-300">د. ${escapeHtml(p.doctor)}</span>
+                    </div>
+                    <div class="flex justify-between font-mono">
+                        <span class="text-gray-400">تاريخ آخر جلسة:</span>
+                        <span>${formatDate(p.lastDate)}</span>
+                    </div>
+                    <div class="flex justify-between font-mono">
+                        <span class="text-fuchsia-400 font-bold">الموعد القادم:</span>
+                        <span class="text-fuchsia-400 font-bold">${formatDate(p.nextDate)}</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-2 border-t border-white/5 text-[11px] font-mono text-gray-400">
+                    <span>الجلسات: ${p.sessionsCount}</span>
+                    <span class="text-emerald-400 font-bold">الإجمالي: ${fmt(p.totalSpent)} IQD</span>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function filterPatientsRegistry(query) {
+        renderPatientsRegistry(query);
+    }
+
+    function quickWhatsAppPatient(phone, name) {
+        let cleanPhone = String(phone || '').replace(/\D/g, '');
+        if (cleanPhone.startsWith('07')) cleanPhone = '964' + cleanPhone.slice(1);
+        if (cleanPhone.startsWith('7')) cleanPhone = '964' + cleanPhone;
+
+        const msg = encodeURIComponent(`مرحباً ${name}، نود تذكيرك بموعد جلستك القادمة في عيادتنا. نتمنى لك دوام الصحة والعافية.`);
+        const url = `https://wa.me/${cleanPhone}?text=${msg}`;
+        window.open(url, '_blank');
+    }
+
+    // ==================== 7. SESSIONS LOG & ARCHIVING ====================
+    function renderSessions() {
+        const tbody = $('#all-sessions-table-body');
+        if (!tbody) return;
+
+        if (State.sessions.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-gray-500">لا توجد جلسات مسجلة بعد</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = State.sessions.map(s => `
+            <tr class="hover:bg-cyan-500/5 transition-colors">
+                <td class="p-3.5 font-bold text-white text-sm">${escapeHtml(s.patientName)}</td>
+                <td class="p-3.5 font-mono text-cyan-300 text-xs">${escapeHtml(s.patientPhone || '—')}</td>
+                <td class="p-3.5 text-white font-tajawal font-bold">${escapeHtml(s.doctorName)}</td>
+                <td class="p-3.5 text-gray-300">${escapeHtml(s.treatmentName)}</td>
+                <td class="p-3.5 font-mono font-black text-emerald-400">${fmt(s.finalPrice)} IQD</td>
+                <td class="p-3.5 text-gray-400 font-mono text-[11px]">${formatDate(s.session1Date || s.createdAt)}</td>
+                <td class="p-3.5 text-cyan-400 font-mono text-[11px]">${formatDate(s.session2Date)}</td>
+                <td class="p-3.5 text-center">
+                    <button class="btn btn-ghost py-1 px-2.5 text-xs text-pink-500 border-pink-500/30" title="حذف الجلسة للأرشيف" onclick="window.ClinicEngine.deleteSession('${s.id}')">
+                        🗑 حذف للأرشيف
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+
+        // Also refresh patients registry
+        renderPatientsRegistry();
+    }
+
+    async function deleteSession(sessionId) {
+        const ok = await DialogEngine.confirm('هل تريد بالتأكيد حذف هذه الجلسة ونقلها للأرشيف؟', 'حذف الجلسة');
+        if (!ok) return;
+
+        try {
+            await window.MedicalFirebase.deleteSessionCloud(sessionId);
+            toast('تم حذف الجلسة ونقلها للأرشيف بنجاح ✓', 'warn');
+        } catch (e) {
+            toast('تعذر حذف الجلسة: ' + e.message, 'error');
         }
     }
 
-    function filterDebts(q) {
-        renderDebts(q);
+    function exportSessionsCSV() {
+        if (State.sessions.length === 0) {
+            toast('لا توجد جلسات لتصديرها', 'warn');
+            return;
+        }
+
+        const rows = [['Patient Name', 'Phone', 'Doctor', 'Treatment', 'Final Price', 'Session 1', 'Session 2 Follow-Up']];
+        State.sessions.forEach(s => {
+            rows.push([s.patientName, s.patientPhone, s.doctorName, s.treatmentName, s.finalPrice, s.session1Date || s.createdAt, s.session2Date]);
+        });
+
+        const csvContent = '\uFEFF' + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `MediNexus_Sessions_${Date.now()}.csv`;
+        link.click();
+        toast('تم تصدير سجل الجلسات بنجاح (CSV) ✓', 'success');
+    }
+
+    // ==================== 8. DEBTS REGISTRY ====================
+    function renderDebts() {
+        const fullContainer = $('#full-debts-container');
+        if (!fullContainer) return;
+
+        if (State.debts.length === 0) {
+            fullContainer.innerHTML = `<div class="p-8 text-center text-gray-500">سجل الديون خالي تماماً ✓</div>`;
+            return;
+        }
+
+        fullContainer.innerHTML = `
+            <div class="overflow-x-auto no-scrollbar">
+                <table class="w-full text-right text-xs">
+                    <thead class="bg-black/40 border-b border-cyan-500/20 text-cyan-400 font-mono">
+                        <tr>
+                            <th class="p-3.5">اسم المريض</th>
+                            <th class="p-3.5">الهاتف</th>
+                            <th class="p-3.5">المتبقي</th>
+                            <th class="p-3.5">تاريخ القيد</th>
+                            <th class="p-3.5">الحالة</th>
+                            <th class="p-3.5 text-center">إجراء</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-white/5 font-tajawal">
+                        ${State.debts.map(d => {
+                            const rem = Number(d.remainingAmount) || 0;
+                            const isPaid = rem <= 0;
+                            return `
+                                <tr class="hover:bg-cyan-500/5 transition-colors">
+                                    <td class="p-3.5 font-bold text-white text-sm">${escapeHtml(d.patientName)}</td>
+                                    <td class="p-3.5 font-mono text-cyan-300 text-xs">${escapeHtml(d.patientPhone || '—')}</td>
+                                    <td class="p-3.5 font-mono font-black ${isPaid ? 'text-emerald-400' : 'text-pink-500'} text-sm">${fmt(rem)} IQD</td>
+                                    <td class="p-3.5 text-gray-400 font-mono text-[11px]">${formatDate(d.createdAt)}</td>
+                                    <td class="p-3.5">
+                                        <span class="badge ${isPaid ? 'badge-emerald' : 'badge-pink'} text-[10px]">${isPaid ? '✓ مسدد' : 'مستحق'}</span>
+                                    </td>
+                                    <td class="p-3.5 text-center">
+                                        ${!isPaid ? `
+                                            <button class="btn btn-success py-1 px-3 text-xs" onclick="window.ClinicEngine.openPayDebtPrompt('${d.id}', ${rem})">
+                                                💵 تسديد
+                                            </button>
+                                        ` : `
+                                            <span class="text-emerald-400 text-xs font-bold">منتهي</span>
+                                        `}
+                                    </td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
     }
 
     function openAddDebtModal() {
@@ -572,12 +970,12 @@
             closeModal('modal-add-debt');
             toast(`تم تسجيل دين بقيمة ${fmt(amount)} IQD للمريض "${patient}"`, 'success');
         } catch (e) {
-            toast('تعذر تسجيل الدين', 'error');
+            toast('تعذر تسجيل الدين: ' + e.message, 'error');
         }
     }
 
     async function openPayDebtPrompt(debtId, currentRem) {
-        const payStr = prompt(`المبلغ المتبقي: ${fmt(currentRem)} IQD\nأدخل المبلغ المراد تسديده الآن (سيتم إضافته للإيراد اليومي):`, String(currentRem));
+        const payStr = prompt(`المبلغ المتبقي: ${fmt(currentRem)} IQD\nأدخل المبلغ المراد تسديده الآن:`, String(currentRem));
         if (!payStr) return;
 
         const amount = Number(payStr) || 0;
@@ -588,124 +986,69 @@
 
         try {
             await window.MedicalFirebase.payDebtCloud(debtId, amount, currentRem);
-            toast(`تم تسديد ${fmt(amount)} IQD وإضافتها للإيراد اليومي ✓`, 'success');
+            toast(`تم تسديد ${fmt(amount)} IQD بنجاح ✓`, 'success');
         } catch (e) {
-            toast('حدث خطأ أثناء معالجة التسديد', 'error');
+            toast('حدث خطأ أثناء التسديد: ' + e.message, 'error');
         }
     }
 
-    // ==================== 5. ADMIN MODULE: ALL SESSIONS HISTORY ====================
-    function renderSessions() {
-        const tbody = $('#all-sessions-table-body');
-        if (!tbody) return;
+    // ==================== 9. ACTIVITIES & SECURITY AUDIT ====================
+    function renderActivities() {
+        const container = $('#activities-log-container');
+        if (!container) return;
 
-        if (State.sessions.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-gray-500">لا توجد جلسات مسجلة بعد</td></tr>`;
+        let list = State.activities.slice();
+        if (State.activityFilter === 'breach') {
+            list = list.filter(a => a.type === 'breach');
+        } else if (State.activityFilter === 'session') {
+            list = list.filter(a => a.type === 'session');
+        }
+
+        if (list.length === 0) {
+            container.innerHTML = `<div class="p-8 text-center text-gray-500 text-xs font-tajawal">لا توجد حركات مسجلة حالياً ✓</div>`;
             return;
         }
 
-        tbody.innerHTML = State.sessions.map(s => `
-            <tr class="hover:bg-cyan-500/5 transition-colors">
-                <td class="p-3.5 font-bold text-white text-sm">${escapeHtml(s.patientName)}</td>
-                <td class="p-3.5 font-mono text-cyan-300 text-xs">${escapeHtml(s.patientPhone || '—')}</td>
-                <td class="p-3.5 text-white font-tajawal font-bold">${escapeHtml(s.doctorName)}</td>
-                <td class="p-3.5 text-gray-300">${escapeHtml(s.treatmentName)}</td>
-                <td class="p-3.5 font-mono font-black text-emerald-400">${fmt(s.finalPrice)} IQD</td>
-                <td class="p-3.5 text-gray-400 font-mono text-[11px]">${formatDate(s.session1Date || s.createdAt)}</td>
-                <td class="p-3.5 text-cyan-400 font-mono text-[11px]">${formatDate(s.session2Date)}</td>
-            </tr>
-        `).join('');
+        container.innerHTML = list.map(act => {
+            const isBreach = act.type === 'breach';
+            const isSession = act.type === 'session';
+            const badgeClass = isBreach ? 'badge-rose' : (isSession ? 'badge-cyan' : 'badge-emerald');
+            const itemClass = isBreach ? 'activity-breach' : (isSession ? 'activity-session' : 'activity-financial');
+            const icon = isBreach ? '🚨' : (isSession ? '🩺' : '💵');
+
+            return `
+                <div class="activity-item ${itemClass}">
+                    <div class="flex items-start gap-3">
+                        <div class="text-2xl mt-0.5">${icon}</div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h5 class="font-bold text-white text-xs">${escapeHtml(act.title)}</h5>
+                                <span class="badge ${badgeClass} text-[9px]">${escapeHtml(act.type.toUpperCase())}</span>
+                            </div>
+                            <p class="text-[11px] text-gray-300 mt-1 leading-relaxed">${escapeHtml(act.details || '')}</p>
+                            <span class="text-[10px] text-cyan-400 font-mono mt-1 block">
+                                الفاعل: ${escapeHtml(act.user || 'نظام')} (${escapeHtml(act.role || '-')})
+                            </span>
+                        </div>
+                    </div>
+                    <div class="text-left font-mono text-[10px] text-gray-400 whitespace-nowrap">
+                        ${formatDate(act.timestamp)}
+                    </div>
+                </div>
+            `;
+        }).join('');
     }
 
-    function exportSessionsCSV() {
-        if (State.sessions.length === 0) {
-            toast('لا توجد جلسات لتصديرها', 'warn');
-            return;
-        }
-
-        const rows = [['Patient Name', 'Phone', 'Doctor', 'Treatment', 'Final Price', 'Session 1', 'Session 2 Follow-Up']];
-        State.sessions.forEach(s => {
-            rows.push([
-                s.patientName,
-                s.patientPhone,
-                s.doctorName,
-                s.treatmentName,
-                s.finalPrice,
-                s.session1Date || s.createdAt,
-                s.session2Date
-            ]);
-        });
-
-        const csvContent = '\uFEFF' + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `MediNexus_Sessions_${Date.now()}.csv`;
-        link.click();
-        toast('تم تصدير سجل الجلسات بنجاح (CSV) ✓', 'success');
+    function filterActivities(type) {
+        State.activityFilter = type;
+        renderActivities();
     }
 
-    // ==================== 6. DOCTOR PORTAL MODULE (MOBILE GLASSMORPHISM) ====================
-    function showDoctorLogin() {
-        $('#doctor-view-login').classList.remove('hidden');
-        $('#doctor-view-dashboard').classList.add('hidden');
-        $('#doctor-view-add-patient').classList.add('hidden');
-        $('#session-user-display').textContent = 'غير مسجل';
-    }
+    // ==================== 10. DOCTOR PORTAL & WHATSAPP AUTOMATION ====================
+    function renderDoctorDashboard() {
+        if (!State.currentUser || State.currentUser.role !== 'doctor') return;
 
-    function showDoctorDashboard() {
-        $('#doctor-view-login').classList.add('hidden');
-        $('#doctor-view-dashboard').classList.remove('hidden');
-        $('#doctor-view-add-patient').classList.add('hidden');
-
-        if (State.currentDoctor) {
-            $('#doc-active-name').textContent = State.currentDoctor.name;
-            $('#doc-active-phone').textContent = `هاتف: ${State.currentDoctor.phone} (@${State.currentDoctor.username})`;
-            $('#session-user-display').textContent = `د. ${State.currentDoctor.name}`;
-            renderDoctorAssignedDashboard();
-        }
-    }
-
-    async function handleDoctorLogin() {
-        const username = $('#doc-login-user').value.trim().toLowerCase();
-        const password = $('#doc-login-pass').value.trim();
-
-        if (!username || !password) {
-            toast('يرجى إدخال اسم المستخدم وكلمة المرور', 'error');
-            return;
-        }
-
-        // Search matching doctor in state
-        const doc = State.doctors.find(d => d.username.toLowerCase() === username && d.subPassword === password);
-
-        if (!doc) {
-            toast('بيانات الدخول غير صحيحة! تأكد من الإدارة', 'error');
-            return;
-        }
-
-        // Verify Session Kill / Freeze Switch
-        if (doc.isActive === false) {
-            await DialogEngine.alert('⚠️ تم تجميد / إيقاف جلستك من قبل الإدارة المركزية.\nيرجى مراجعة إدارة العيادة لإعادة التفعيل.', 'حساب معلق');
-            return;
-        }
-
-        State.currentDoctor = doc;
-        localStorage.setItem('medinexus_active_doctor', JSON.stringify(doc));
-        showDoctorDashboard();
-        toast(`أهلاً بك دكتور ${doc.name} 👋`, 'success');
-    }
-
-    function logoutDoctor() {
-        State.currentDoctor = null;
-        localStorage.removeItem('medinexus_active_doctor');
-        showDoctorLogin();
-        toast('تم تسجيل الخروج من بوابة الطبيب', 'info');
-    }
-
-    function renderDoctorAssignedDashboard() {
-        if (!State.currentDoctor) return;
-
-        const mySessionsToday = getDoctorTodaySessions(State.currentDoctor.uid);
+        const mySessionsToday = getDoctorTodaySessions(State.currentUser.uid);
         const myRevToday = mySessionsToday.reduce((sum, s) => sum + (Number(s.finalPrice) || 0), 0);
 
         $('#doc-stat-today-revenue').textContent = fmt(myRevToday);
@@ -722,12 +1065,12 @@
             `;
         } else {
             list.innerHTML = mySessionsToday.map(s => `
-                <div class="p-3.5 rounded-2xl bg-black/40 border border-white/10 hover:border-cyan-400/30 transition-all">
+                <div class="p-3.5 rounded-2xl bg-black/40 border border-white/10 hover:border-cyan-400/30 transition-all font-tajawal">
                     <div class="flex items-center justify-between mb-1.5">
                         <span class="font-bold text-white text-sm">${escapeHtml(s.patientName)}</span>
                         <span class="font-mono font-black text-emerald-400 text-sm">${fmt(s.finalPrice)} IQD</span>
                     </div>
-                    <div class="text-xs text-gray-300 font-tajawal">العلاج: ${escapeHtml(s.treatmentName)}</div>
+                    <div class="text-xs text-gray-300">العلاج: ${escapeHtml(s.treatmentName)}</div>
                     <div class="flex items-center justify-between mt-2 pt-2 border-t border-white/5 text-[10px] text-gray-400 font-mono">
                         <span>جلسة 2: ${formatDate(s.session2Date)}</span>
                         <span>${formatDate(s.createdAt).slice(11)}</span>
@@ -737,28 +1080,22 @@
         }
     }
 
-    // ==================== 7. FULL-SCREEN ADD PATIENT FLOW & MESSAGING ====================
     function openAddPatientFullScreen() {
-        if (!State.currentDoctor) {
-            toast('يرجى تسجيل الدخول كطبيب أولاً', 'warn');
-            return;
-        }
+        if (!State.currentUser || State.currentUser.role !== 'doctor') return;
 
-        // Reset Form Fields
         $('#pt-name').value = '';
         $('#pt-phone').value = '';
         $('#pt-treatment-select').value = '';
         $('#pt-final-price').value = '';
         $('#pt-base-price-hint').textContent = 'السعر الافتراضي: 0';
 
-        // Pre-fill next session date with default 7 days from now at 10:00 AM
         const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
         nextWeek.setHours(10, 0, 0, 0);
         const isoLocal = new Date(nextWeek.getTime() - nextWeek.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
         $('#pt-session2-date').value = isoLocal;
 
         $('#doctor-view-add-patient').classList.remove('hidden');
-        setTimeout(() => $('#pt-name').focus(), 200);
+        setTimeout(() => $('#pt-name').focus(), 150);
     }
 
     function closeAddPatientFullScreen() {
@@ -776,17 +1113,10 @@
         }
     }
 
-    // Submission & Notification Generation
+    // Submit Patient Session with Automated WhatsApp Message
     async function submitPatientSession() {
-        if (!State.currentDoctor) {
-            toast('جلسة الطبيب منتهية، يرجى تسجيل الدخول مجدداً', 'error');
-            return;
-        }
-
-        // Check if doctor is still active
-        const liveDoc = State.doctors.find(d => d.uid === State.currentDoctor.uid);
-        if (liveDoc && liveDoc.isActive === false) {
-            await DialogEngine.alert('⚠️ تم تجميد حسابك من قبل الإدارة المركزية، لا يمكن حفظ الجلسة.', 'حساب معلق');
+        if (!State.currentUser || State.currentUser.role !== 'doctor') {
+            toast('جلسة الطبيب غير صالحة', 'error');
             return;
         }
 
@@ -809,9 +1139,9 @@
         const formattedNow = formatDate(nowIso);
         const formattedSession2 = formatDate(session2Date);
 
-        // Required Structured Patient Notification Template (قالب الإشعار المحدد بالطلب)
+        // Required Exact Template Message
         const notificationText = 
-`مرحباً بك في عيادة الدكتور ${State.currentDoctor.name}
+`مرحباً بك في عيادة الدكتور ${State.currentUser.name}
 اسم المريض: ${patientName}
 الجلسة الأولى
 اسم العلاج: ${treatmentName}
@@ -820,10 +1150,12 @@
 موعد الجلسة الثانية والوقت والتاريخ: ${formattedSession2}`;
 
         const sessionPayload = {
-            doctorId: State.currentDoctor.uid,
-            doctorName: State.currentDoctor.name,
+            doctorId: State.currentUser.uid,
+            doctorName: State.currentUser.name,
+            doctorPhone: State.currentUser.phone,
             patientName,
             patientPhone,
+            treatmentId,
             treatmentName,
             finalPrice,
             session1Date: nowIso,
@@ -832,106 +1164,109 @@
 
         const submitBtn = $('#btn-submit-patient');
         submitBtn.disabled = true;
-        submitBtn.textContent = 'جارِ حفظ الجلسة وتحديث السحابة...';
+        submitBtn.textContent = 'جارِ الحفظ في قاعدة البيانات...';
 
         try {
             await window.MedicalFirebase.recordPatientSessionCloud(sessionPayload);
 
-            submitBtn.disabled = false;
-            submitBtn.textContent = '✓ حفظ الجلسة وإصدار الإشعار المنظم';
-
             closeAddPatientFullScreen();
-            showDoctorDashboard();
+            renderDoctorDashboard();
+            toast('تم حفظ الجلسة بنجاح ✓ جارِ فتح WhatsApp تلقائياً...', 'success');
 
-            // Open Template Notification Preview Modal
-            State.generatedMessage = notificationText;
-            State.lastPatientPhone = patientPhone;
-            $('#notification-template-text').textContent = notificationText;
-            openModal('modal-notification-preview');
+            // Automatic WhatsApp Dispatch to Patient Phone
+            triggerWhatsAppDispatch(patientPhone, notificationText);
 
-            toast('تم حفظ الجلسة وتحديث الإيرادات بنجاح ✓', 'success');
-        } catch (e) {
+        } catch (err) {
+            console.error('Session Save Error:', err);
+            toast('فشل الحفظ في السحابة: ' + (err.message || 'خطأ غير متوقع'), 'error');
+        } finally {
             submitBtn.disabled = false;
-            submitBtn.textContent = '✓ حفظ الجلسة وإصدار الإشعار المنظم';
-            toast('حدث خطأ أثناء حفظ الجلسة في السحابة', 'error');
+            submitBtn.textContent = '✓ حفظ الجلسة وإرسال إشعار WhatsApp فوراً';
         }
     }
 
-    function sendWhatsAppNotification() {
-        if (!State.generatedMessage) return;
-        let phone = String(State.lastPatientPhone || '').replace(/\D/g, '');
-        // Standardize Iraqi local phone numbers to international +964
+    function triggerWhatsAppDispatch(patientPhone, message) {
+        let phone = String(patientPhone || '').replace(/\D/g, '');
         if (phone.startsWith('07')) phone = '964' + phone.slice(1);
         if (phone.startsWith('7')) phone = '964' + phone;
 
-        const encoded = encodeURIComponent(State.generatedMessage);
-        const waUrl = phone ? `https://wa.me/${phone}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
-        window.open(waUrl, '_blank');
+        const encodedMsg = encodeURIComponent(message);
+        const waUrl = phone ? `https://wa.me/${phone}?text=${encodedMsg}` : `https://wa.me/?text=${encodedMsg}`;
+
+        try {
+            const w = window.open(waUrl, '_blank');
+            if (!w || w.closed || typeof w.closed === 'undefined') {
+                window.location.href = waUrl;
+            }
+        } catch (e) {
+            window.location.href = waUrl;
+        }
     }
 
-    function copyNotificationText() {
-        if (!State.generatedMessage) return;
-        navigator.clipboard.writeText(State.generatedMessage).then(() => {
-            toast('تم نسخ نص الرسالة إلى الحافظة ✓', 'success');
-        }).catch(() => {
-            toast('يرجى تحديد النص ونسخه يدوياً', 'warn');
-        });
-    }
-
-    // ==================== SYSTEM LIFECYCLE & SUBSCRIPTIONS ====================
+    // ==================== 11. LIFECYCLE & SYNC PIPELINE ====================
     async function initSystem() {
-        // Initialize Firebase Engine
         await window.MedicalFirebase.init();
 
-        // 1. Subscribe to Live Finances
+        // Restore active session
+        const cachedSession = localStorage.getItem('medinexus_session');
+        if (cachedSession) {
+            try {
+                State.currentUser = JSON.parse(cachedSession);
+                enterAppSession(State.currentUser.role);
+            } catch (e) {
+                localStorage.removeItem('medinexus_session');
+            }
+        }
+
+        // Real-Time Subscriptions
         window.MedicalFirebase.subscribeFinances(data => {
             State.finances = data || { dailyTotal: 0, monthlyTotal: 0 };
             renderFinances();
         });
 
-        // 2. Subscribe to Central Treatments Catalog
         window.MedicalFirebase.subscribeTreatments(list => {
             State.treatments = list || [];
             renderTreatments();
         });
 
-        // 3. Subscribe to Doctors & Live Statuses
         window.MedicalFirebase.subscribeDoctors(list => {
             State.doctors = list || [];
             renderDoctors();
+            renderFinances(); // updates active doctors count
 
-            // Live security check for active doctor
-            if (State.currentDoctor) {
-                const updatedMe = State.doctors.find(d => d.uid === State.currentDoctor.uid);
-                if (updatedMe && updatedMe.isActive === false) {
-                    logoutDoctor();
-                    DialogEngine.alert('🚨 تم إيقاف / تجميد جلستك من قبل الإدارة المركزية.', 'إلغاء الجلسة');
+            if (State.currentUser && State.currentUser.role === 'doctor') {
+                const liveMe = State.doctors.find(d => d.uid === State.currentUser.uid);
+                if (liveMe && liveMe.isActive === false) {
+                    handleGlobalLogout();
+                    DialogEngine.alert('🚨 تم تجميد وإيقاف حسابك من قبل الإدارة المركزية.', 'حساب معلق');
                 }
             }
         });
 
-        // 4. Subscribe to Sessions
         window.MedicalFirebase.subscribeSessions(list => {
             State.sessions = list || [];
             renderSessions();
             renderDoctors();
-            if (State.currentDoctor) renderDoctorAssignedDashboard();
+            if (State.currentUser && State.currentUser.role === 'doctor') {
+                renderDoctorDashboard();
+            }
         });
 
-        // 5. Subscribe to Debts
+        window.MedicalFirebase.subscribeConsumedLogs(list => {
+            State.consumedLogs = list || [];
+            renderConsumedProducts();
+        });
+
         window.MedicalFirebase.subscribeDebts(list => {
             State.debts = list || [];
             renderDebts();
             renderFinances();
         });
 
-        // Restore cached doctor session if available
-        const cachedDoc = localStorage.getItem('medinexus_active_doctor');
-        if (cachedDoc) {
-            try {
-                State.currentDoctor = JSON.parse(cachedDoc);
-            } catch (e) {}
-        }
+        window.MedicalFirebase.subscribeActivities(list => {
+            State.activities = list || [];
+            renderActivities();
+        });
 
         // Live Clock
         setInterval(() => {
@@ -942,7 +1277,7 @@
         // Escape Key Modal Dismissal
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') {
-                ['modal-add-doctor', 'modal-doctor-details', 'modal-add-treatment', 'modal-add-debt', 'modal-notification-preview'].forEach(id => closeModal(id));
+                ['modal-add-doctor', 'modal-doctor-details', 'modal-add-treatment', 'modal-edit-treatment', 'modal-consumed-details', 'modal-add-debt', 'modal-sys-alert', 'modal-sys-confirm'].forEach(id => closeModal(id));
                 closeDrawer();
                 if (!$('#doctor-view-add-patient').classList.contains('hidden')) {
                     closeAddPatientFullScreen();
@@ -950,25 +1285,24 @@
             }
         });
 
-        console.log('%c🚀 MEDINEXUS PRO Master Application Engine Online', 'color:#00F0FF;font-weight:900');
+        console.log('%c🚀 MEDINEXUS PRO Master Architecture Online', 'color:#00F0FF;font-weight:900');
     }
 
-    // Public Surface Binding API
+    // Public Surface Bindings
     window.ClinicEngine = {
         openDrawer, closeDrawer,
-        togglePortalMode, setPortalMode, switchAdminView, headerQuickAction,
-        transferDailyRevenue,
-        openAddDoctorModal, confirmCreateDoctor, openDoctorDetailsModal, toggleDoctorFreeze,
-        openAddTreatmentModal, confirmCreateTreatment, deleteTreatment,
-        openAddDebtModal, confirmCreateDebt, filterDebts, openPayDebtPrompt,
-        exportSessionsCSV,
-        handleDoctorLogin, logoutDoctor,
+        handleGlobalLogin, handleGlobalLogout,
+        switchAdminView, headerQuickAction,
+        transferDailyRevenue, resetDebtsOnly, fullSystemReset,
+        openAddDoctorModal, confirmCreateDoctor, deleteDoctor, openDoctorDetailsModal, toggleDoctorFreeze,
+        openAddTreatmentModal, confirmCreateTreatment, openEditTreatmentModal, confirmUpdateTreatment, deleteTreatment,
+        openConsumedDetails,
+        filterPatientsRegistry, quickWhatsAppPatient,
+        deleteSession, exportSessionsCSV,
+        openAddDebtModal, confirmCreateDebt, openPayDebtPrompt,
+        filterActivities,
         openAddPatientFullScreen, closeAddPatientFullScreen, onTreatmentSelectChange, submitPatientSession,
-        sendWhatsAppNotification, copyNotificationText,
-        refreshCloudData: () => window.location.reload(),
-        handleLogout: () => {
-            if (confirm('هل ترغب بتسجيل الخروج؟')) window.location.reload();
-        },
+        getCurrentUserContext, showSecurityWarning,
         closeModal
     };
 

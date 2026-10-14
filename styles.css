@@ -1,5 +1,5 @@
 /* ==================================================================
-   MEDINEXUS PRO — Medical Cyber & Glassmorphism Design System
+   MEDINEXUS PRO — Sleek Ultra-Glassmorphism & Medical Cyber Design
    ================================================================== */
 
 *, *::before, *::after {
@@ -11,25 +11,26 @@
 
 :root {
     --bg-deep: #070b19;
-    --bg-surface: #0c1228;
+    --bg-surface: #0a1026;
     --medical-cyan: #00F0FF;
     --medical-blue: #2563EB;
     --medical-emerald: #00FF88;
     --medical-pink: #FF007A;
     --medical-amber: #FBBF24;
     --medical-violet: #8B5CF6;
+    --medical-rose: #F43F5E;
     --text-primary: #FFFFFF;
     --text-muted: #8E9BB2;
 
     /* Frosted Glass Tokens */
-    --glass-bg: rgba(14, 22, 48, 0.45);
-    --glass-border: rgba(0, 240, 255, 0.18);
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.12);
     --glass-border-hover: rgba(0, 240, 255, 0.45);
-    --glass-blur: blur(20px) saturate(190%);
+    --glass-blur: blur(16px) saturate(180%);
     --glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
 
     /* Mobile Doctor Portal Glass Card */
-    --doc-card-bg: rgba(15, 23, 42, 0.65);
+    --doc-card-bg: rgba(255, 255, 255, 0.06);
     --doc-card-border: rgba(0, 240, 255, 0.22);
 }
 
@@ -41,9 +42,53 @@ html, body {
     min-height: 100vh;
     overscroll-behavior: none;
     direction: rtl;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
-/* ==================== 3D CANVAS & AMBIENT GLOW NODES ==================== */
+/* ==================== 1. GLOBAL LOGIN GATEWAY ==================== */
+
+.global-login-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: radial-gradient(circle at center, rgba(14, 24, 56, 0.95) 0%, rgba(7, 11, 25, 0.98) 100%);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.glass-login-box {
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: 28px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 35px rgba(0, 240, 255, 0.2);
+    position: relative;
+    animation: loginScaleIn 0.35s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.glass-login-box::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 10%;
+    right: 10%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--medical-cyan), var(--medical-blue), transparent);
+}
+
+@keyframes loginScaleIn {
+    from { opacity: 0; transform: scale(0.92) translateY(20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ==================== 2. LIGHTWEIGHT 3D CANVAS & AMBIENT GLOW ==================== */
 
 #space-canvas {
     position: fixed;
@@ -66,35 +111,14 @@ html, body {
     position: absolute;
     border-radius: 50%;
     filter: blur(120px);
-    opacity: 0.28;
+    opacity: 0.25;
     will-change: transform;
     transition: transform 0.8s cubic-bezier(0.34, 1.2, 0.64, 1);
 }
 
-.orb-1 {
-    width: 520px;
-    height: 520px;
-    background: radial-gradient(circle, var(--medical-cyan) 0%, transparent 70%);
-    top: -10%;
-    right: -10%;
-}
-
-.orb-2 {
-    width: 480px;
-    height: 480px;
-    background: radial-gradient(circle, var(--medical-blue) 0%, transparent 70%);
-    bottom: -15%;
-    left: -10%;
-}
-
-.orb-3 {
-    width: 380px;
-    height: 380px;
-    background: radial-gradient(circle, var(--medical-emerald) 0%, transparent 70%);
-    top: 45%;
-    left: 20%;
-    opacity: 0.18;
-}
+.orb-1 { width: 500px; height: 500px; background: radial-gradient(circle, var(--medical-cyan) 0%, transparent 70%); top: -10%; right: -10%; }
+.orb-2 { width: 450px; height: 450px; background: radial-gradient(circle, var(--medical-blue) 0%, transparent 70%); bottom: -15%; left: -10%; }
+.orb-3 { width: 350px; height: 350px; background: radial-gradient(circle, var(--medical-emerald) 0%, transparent 70%); top: 45%; left: 20%; opacity: 0.16; }
 
 .bg-grid-medical {
     position: fixed;
@@ -123,16 +147,16 @@ html, body {
     pointer-events: none;
 }
 
-/* ==================== MASTER HEADER & NAVIGATION ==================== */
+/* ==================== 3. MASTER HEADER & NAVIGATION ==================== */
 
 .app-header {
     position: sticky;
     top: 0;
     z-index: 100;
-    background: rgba(7, 11, 25, 0.82);
-    backdrop-filter: blur(20px) saturate(190%);
-    -webkit-backdrop-filter: blur(20px) saturate(190%);
-    border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+    background: rgba(7, 11, 25, 0.85);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border-bottom: 1px solid var(--glass-border);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
 }
 
@@ -182,7 +206,7 @@ html, body {
     box-shadow: 0 0 20px rgba(0, 240, 255, 0.35);
 }
 
-/* ==================== SYSTEM STATUS INDICATORS ==================== */
+/* ==================== 4. SYSTEM STATUS INDICATORS ==================== */
 
 .fb-status {
     display: inline-flex;
@@ -195,7 +219,7 @@ html, body {
     padding: 3px 9px;
     border-radius: 8px;
     background: rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--glass-border);
     user-select: none;
 }
 
@@ -244,7 +268,7 @@ html, body {
     100% { transform: scale(2.2); opacity: 0; }
 }
 
-/* ==================== BUTTONS & CALL-TO-ACTIONS ==================== */
+/* ==================== 5. BUTTONS & UI CONTROLS ==================== */
 
 .btn {
     display: inline-flex;
@@ -303,11 +327,11 @@ html, body {
 }
 
 .btn-ghost {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(0, 240, 255, 0.2);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
     color: #ffffff;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
 }
 
 .btn-ghost:hover {
@@ -338,7 +362,7 @@ html, body {
     box-shadow: 0 0 25px rgba(0, 240, 255, 0.35);
 }
 
-/* ==================== FROSTED GLASS SURFACES ==================== */
+/* ==================== 6. ULTRA-GLASSMORPHIC SURFACES ==================== */
 
 .glass {
     background: var(--glass-bg);
@@ -368,11 +392,10 @@ html, body {
     box-shadow: 0 20px 45px rgba(0, 0, 0, 0.65), 0 0 25px rgba(0, 240, 255, 0.15);
 }
 
-/* Doctor Portal Glassmorphism Cards */
 .glass-doctor-card {
     background: var(--doc-card-bg);
-    backdrop-filter: blur(24px) saturate(200%);
-    -webkit-backdrop-filter: blur(24px) saturate(200%);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
     border: 1px solid var(--doc-card-border);
     border-radius: 24px;
     position: relative;
@@ -389,15 +412,9 @@ html, body {
     right: 8%;
     height: 2px;
     background: linear-gradient(90deg, transparent, var(--medical-cyan), var(--medical-blue), transparent);
-    filter: blur(0.5px);
 }
 
-.glass-doctor-card:hover {
-    border-color: rgba(0, 240, 255, 0.5);
-    box-shadow: 0 22px 55px rgba(0, 0, 0, 0.7), 0 0 35px rgba(0, 240, 255, 0.2);
-}
-
-/* ==================== STATS MODULES ==================== */
+/* ==================== 7. STATS CARDS & MODULES ==================== */
 
 .stat-card {
     position: relative;
@@ -405,6 +422,7 @@ html, body {
     border-radius: 22px;
     background: var(--glass-bg);
     backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
     border: 1px solid var(--glass-border);
     transition: transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1), box-shadow 0.3s;
     overflow: hidden;
@@ -438,6 +456,7 @@ html, body {
 .stat-emerald { color: var(--medical-emerald); border-color: rgba(0, 255, 136, 0.35); }
 .stat-cyan { color: var(--medical-cyan); border-color: rgba(0, 240, 255, 0.35); }
 .stat-pink { color: var(--medical-pink); border-color: rgba(255, 0, 122, 0.35); }
+.stat-violet { color: var(--medical-violet); border-color: rgba(139, 92, 246, 0.4); }
 
 .stat-tag {
     font-family: 'JetBrains Mono', monospace;
@@ -468,14 +487,15 @@ html, body {
     letter-spacing: 0.12em;
 }
 
-/* ==================== DOCTOR INTERACTIVE CARDS & CONTROLS ==================== */
+/* ==================== 8. DOCTOR INTERACTIVE CARDS ==================== */
 
 .doctor-item-card {
     padding: 22px;
     border-radius: 20px;
     background: var(--glass-bg);
     backdrop-filter: var(--glass-blur);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
     transition: all 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
     position: relative;
     overflow: hidden;
@@ -483,7 +503,7 @@ html, body {
 
 .doctor-item-card.frozen {
     border-color: rgba(255, 0, 122, 0.4);
-    background: rgba(45, 15, 25, 0.35);
+    background: rgba(45, 15, 25, 0.25);
 }
 
 .doctor-item-card:hover {
@@ -492,7 +512,26 @@ html, body {
     box-shadow: 0 16px 45px rgba(0, 0, 0, 0.6), 0 0 25px rgba(0, 240, 255, 0.2);
 }
 
-/* Freeze / Kill-Switch Custom Toggle */
+.btn-delete-doc {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: rgba(255, 0, 122, 0.12);
+    border: 1px solid rgba(255, 0, 122, 0.3);
+    color: var(--medical-pink);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-delete-doc:hover {
+    background: rgba(255, 0, 122, 0.3);
+    transform: scale(1.1);
+}
+
+/* Freeze Toggle */
 .switch-container {
     display: inline-flex;
     align-items: center;
@@ -534,7 +573,43 @@ html, body {
     box-shadow: 0 0 10px var(--medical-emerald);
 }
 
-/* ==================== FORMS & INPUT CONTROLS ==================== */
+/* ==================== 9. PATIENT REGISTRY & CONSUMED PRODUCTS ==================== */
+
+.patient-card {
+    padding: 18px;
+    border-radius: 18px;
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    transition: all 0.25s;
+    position: relative;
+}
+
+.patient-card:hover {
+    border-color: var(--medical-cyan);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 240, 255, 0.15);
+}
+
+/* Consumed Progress Bar */
+.stock-bar-wrap {
+    width: 100%;
+    height: 6px;
+    border-radius: 99px;
+    background: rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+    margin-top: 6px;
+}
+
+.stock-bar-fill {
+    height: 100%;
+    border-radius: 99px;
+    background: linear-gradient(90deg, var(--medical-cyan), var(--medical-emerald));
+    transition: width 0.4s ease-out;
+}
+
+/* ==================== 10. INPUT CONTROLS ==================== */
 
 .inp {
     width: 100%;
@@ -582,13 +657,13 @@ select.inp option {
     font-family: 'Tajawal', sans-serif;
 }
 
-/* ==================== FULL-SCREEN ADD PATIENT FLOW ==================== */
+/* ==================== 11. FULL-SCREEN PATIENT FLOW ==================== */
 
 .full-screen-flow {
     position: fixed;
     inset: 0;
     z-index: 250;
-    background: rgba(7, 11, 25, 0.95);
+    background: rgba(7, 11, 25, 0.96);
     backdrop-filter: blur(28px);
     -webkit-backdrop-filter: blur(28px);
     overflow-y: auto;
@@ -600,7 +675,7 @@ select.inp option {
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* ==================== BADGES ==================== */
+/* ==================== 12. BADGES ==================== */
 
 .badge {
     display: inline-flex;
@@ -617,8 +692,10 @@ select.inp option {
 .badge-emerald { background: rgba(0, 255, 136, 0.15); color: var(--medical-emerald); border: 1px solid rgba(0, 255, 136, 0.35); }
 .badge-cyan { background: rgba(0, 240, 255, 0.15); color: var(--medical-cyan); border: 1px solid rgba(0, 240, 255, 0.35); }
 .badge-pink { background: rgba(255, 0, 122, 0.15); color: var(--medical-pink); border: 1px solid rgba(255, 0, 122, 0.35); }
+.badge-rose { background: rgba(244, 63, 94, 0.15); color: var(--medical-rose); border: 1px solid rgba(244, 63, 94, 0.4); }
+.badge-amber { background: rgba(251, 191, 36, 0.15); color: var(--medical-amber); border: 1px solid rgba(251, 191, 36, 0.4); }
 
-/* ==================== DRAWER (OFF-CANVAS) ==================== */
+/* ==================== 13. DRAWER (OFF-CANVAS) ==================== */
 
 .drawer {
     position: fixed;
@@ -628,10 +705,10 @@ select.inp option {
     max-width: 85vw;
     height: 100%;
     z-index: 300;
-    background: rgba(10, 16, 38, 0.85);
-    backdrop-filter: blur(28px) saturate(210%);
-    -webkit-backdrop-filter: blur(28px) saturate(210%);
-    border-left: 1px solid rgba(0, 240, 255, 0.2);
+    background: rgba(10, 16, 38, 0.9);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border-left: 1px solid var(--glass-border);
     transform: translateX(100%);
     transition: transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1);
     display: flex;
@@ -667,8 +744,8 @@ select.inp option {
     gap: 12px;
     padding: 13px 15px;
     border-radius: 14px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
     color: #94a3b8;
     font-weight: 700;
     font-size: 14px;
@@ -692,18 +769,15 @@ select.inp option {
     box-shadow: 0 0 25px rgba(0, 240, 255, 0.2);
 }
 
-.nav-icon {
-    font-size: 18px;
-}
-
-/* ==================== MODALS & SYSTEM DIALOGS ==================== */
+/* ==================== 14. MODALS & SYSTEM DIALOGS ==================== */
 
 .modal-bd {
     position: fixed;
     inset: 0;
     z-index: 500;
-    background: rgba(0, 0, 0, 0.78);
-    backdrop-filter: blur(14px);
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
     display: none;
     align-items: center;
     justify-content: center;
@@ -716,14 +790,14 @@ select.inp option {
     to { opacity: 1; }
 }
 
-/* ==================== TOAST DISPATCHER ==================== */
+/* ==================== 15. TOAST DISPATCHER ==================== */
 
 #toast-wrap {
     position: fixed;
     top: 75px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 9999;
+    z-index: 99999;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -767,25 +841,13 @@ select.inp option {
     to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ==================== PORTALS & VIEW SWITCHERS ==================== */
+/* ==================== 16. PORTALS & VIEW SWITCHERS ==================== */
 
-.portal-section {
-    display: none;
-}
+.portal-section { display: none; }
+.portal-section.active { display: block; animation: viewIn 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
 
-.portal-section.active {
-    display: block;
-    animation: viewIn 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.admin-view {
-    display: none;
-}
-
-.admin-view.active {
-    display: block;
-    animation: viewIn 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-}
+.admin-view { display: none; }
+.admin-view.active { display: block; animation: viewIn 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
 
 @keyframes viewIn {
     from { opacity: 0; transform: translateY(12px); }

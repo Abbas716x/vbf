@@ -1,5 +1,5 @@
 /* ==================================================================
-   MEDINEXUS PRO — Master Clinic Control Engine & Operations
+   MEDINEXUS PRO — Master Clinic Control Engine & Operations v2.0
    ================================================================== */
 
 (function () {
@@ -22,12 +22,68 @@
         })[m]);
     }
 
+    /* ==================== COUNTUP ANIMATION ENGINE ==================== */
+    class CountUp {
+        constructor(el, opts = {}) {
+            this.el = typeof el === 'string' ? document.querySelector(el) : el;
+            this.current = 0;
+            this.target = 0;
+            this.raf = null;
+            this.duration = opts.duration || 1200;
+            this.formatter = opts.formatter || (n => new Intl.NumberFormat('en-US').format(Math.round(n)));
+        }
+        set(value) {
+            const target = Number(value) || 0;
+            if (target === this.target && this.raf === null) return;
+            const start = this.current;
+            const startTime = performance.now();
+            const self = this;
+            if (this.raf) cancelAnimationFrame(this.raf);
+
+            const tick = (now) => {
+                const progress = Math.min(1, (now - startTime) / self.duration);
+                const eased = 1 - Math.pow(1 - progress, 5);
+                self.current = start + (target - start) * eased;
+                if (self.el) self.el.textContent = self.formatter(self.current);
+                if (progress < 1) {
+                    self.raf = requestAnimationFrame(tick);
+                } else {
+                    self.current = target;
+                    if (self.el) self.el.textContent = self.formatter(target);
+                    self.raf = null;
+                }
+            };
+            this.target = target;
+            this.raf = requestAnimationFrame(tick);
+        }
+    }
+
+    const _counters = new Map();
+    function countUp(selector, value) {
+        if (!_counters.has(selector)) {
+            _counters.set(selector, new CountUp(selector));
+        }
+        _counters.get(selector).set(value);
+    }
+
+    /* Skeleton helpers */
+    function showTableSkeleton(tbodyId, rows = 4) {
+        const el = document.getElementById(tbodyId);
+        if (!el) return;
+        el.innerHTML = Array.from({ length: rows }).map(() => `<tr><td colspan="8"><div class="skeleton-row"></div></td></tr>`).join('');
+    }
+    function showGridSkeleton(gridId, count = 3) {
+        const el = document.getElementById(gridId);
+        if (!el) return;
+        el.innerHTML = Array.from({ length: count }).map(() => `<div class="skeleton" style="height:180px"></div>`).join('');
+    }
+
     // Master System State
     const State = {
-        currentUser: null,    // { role: 'admin'|'doctor', name, username, phone, uid }
-        portalMode: 'admin',  // 'admin' | 'doctor'
+        currentUser: null,
+        portalMode: 'admin',
         activeAdminView: 'admin-dashboard',
-        activityFilter: 'all', // 'all' | 'breach' | 'session'
+        activityFilter: 'all',
         finances: { dailyTotal: 0, monthlyTotal: 0 },
         doctors: [],
         treatments: [],
@@ -114,7 +170,6 @@
         $('#drawer-overlay')?.classList.remove('show');
     }
 
-    // Context for security.js
     function getCurrentUserContext() {
         if (State.currentUser) return State.currentUser;
         return { name: 'زائر / شاشة الدخول', role: 'guest', username: 'guest' };
@@ -139,7 +194,6 @@
         submitBtn.textContent = 'جارِ التحقق من السحابة...';
 
         try {
-            // A. Master Admin Check
             if (username === 'abbbas111' && password === 'QWERT') {
                 State.currentUser = { role: 'admin', name: 'المدير العام', username: 'abbbas111' };
                 localStorage.setItem('medinexus_session', JSON.stringify(State.currentUser));
@@ -148,7 +202,6 @@
                 return;
             }
 
-            // B. Doctor Check in Firestore
             const doctorData = await window.MedicalFirebase.verifyDoctorCredentials(username, password);
             State.currentUser = {
                 role: 'doctor',
@@ -235,18 +288,17 @@
         window.scrollTo({ top: 0, behavior: 'instant' });
     }
 
-    // ==================== 2. MAIN FINANCIAL DASHBOARD & RESETS ====================
+    // ==================== 2. MAIN FINANCIAL DASHBOARD ====================
     function renderFinances() {
         const daily = Number(State.finances.dailyTotal) || 0;
         const monthly = Number(State.finances.monthlyTotal) || 0;
         const activeDocsCount = State.doctors.filter(d => d.isActive !== false).length;
 
-        $('#stat-daily-rev').textContent = fmt(daily);
-        $('#stat-monthly-rev').textContent = fmt(monthly);
-        $('#stat-active-doctors-count').textContent = activeDocsCount;
+        countUp('#stat-daily-rev', daily);
+        countUp('#stat-monthly-rev', monthly);
+        countUp('#stat-active-doctors-count', activeDocsCount);
     }
 
-    // زر 1: تصفير إيراد اليوم وتحويله للتراكمي
     async function transferDailyRevenue() {
         const daily = Number(State.finances.dailyTotal) || 0;
         if (daily <= 0) {
@@ -268,7 +320,6 @@
         }
     }
 
-    // زر 2: تصفير الدين بالكامل
     async function resetDebtsOnly() {
         const totalDebts = State.debts.reduce((sum, d) => sum + (Number(d.remainingAmount) || 0), 0);
         if (totalDebts <= 0 && State.debts.length === 0) {
@@ -290,7 +341,6 @@
         }
     }
 
-    // زر 3: تصفير كامل للنظام
     async function fullSystemReset() {
         const ok = await DialogEngine.confirm(
             '⚠️ تحذير شديد الخطورة:\nسيؤدي هذا الإجراء إلى تصفير إيراد اليوم، الإيراد التراكمي، وسجل الديون إلى صفر (0).\n\nهل تؤكد تصفير كامل النظام؟',
@@ -306,7 +356,7 @@
         }
     }
 
-    // ==================== 3. DOCTORS MANAGEMENT & DETAILED PROFILE ====================
+    // ==================== 3. DOCTORS MANAGEMENT ====================
     function renderDoctors() {
         const grid = $('#doctors-cards-grid');
         const quickGrid = $('#quick-doctors-grid');
@@ -334,10 +384,8 @@
             return `
                 <div class="doctor-item-card ${!isActive ? 'frozen' : ''}" id="doc-card-${doc.uid}">
                     <div class="flex items-start justify-between mb-4">
-                        <div class="flex items-center gap-3 cursor-pointer" onclick="window.ClinicEngine.openDoctorDetailsModal('${doc.uid}')">
-                            <div class="w-12 h-12 rounded-2xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-2xl shadow-lg">
-                                👨‍⚕️
-                            </div>
+                        <div class="flex items-center gap-3.5 cursor-pointer" onclick="window.ClinicEngine.openDoctorDetailsModal('${doc.uid}')">
+                            <div class="avatar-3d"><span>👨‍⚕️</span></div>
                             <div>
                                 <h4 class="font-bold text-white text-base font-tajawal hover:text-cyan-400 transition-colors">${escapeHtml(doc.name)}</h4>
                                 <div class="flex items-center gap-2 mt-1">
@@ -349,7 +397,6 @@
                             </div>
                         </div>
 
-                        <!-- Actions: Freeze switch & Delete Trash Button -->
                         <div class="flex items-center gap-2">
                             <div class="switch-container" title="${isActive ? 'إيقاف / تجميد الجلسة' : 'استئناف وتفعيل الجلسة'}" onclick="window.ClinicEngine.toggleDoctorFreeze('${doc.uid}', ${isActive})">
                                 <div class="switch-track ${isActive ? 'active' : ''}">
@@ -444,7 +491,6 @@
         }
     }
 
-    // Modal: Detailed Doctor Profile (Image 3 requirements)
     function openDoctorDetailsModal(doctorId) {
         const doc = State.doctors.find(d => d.uid === doctorId || d.id === doctorId);
         if (!doc) return;
@@ -457,7 +503,6 @@
         $('#modal-doc-title-user').textContent = `اسم المستخدم: @${doc.username} • الهاتف: ${doc.phone}`;
         $('#modal-doc-today-rev').textContent = `${fmt(todayRev)} IQD`;
 
-        // 1. List of Treatments/Medicines used by this doctor today
         const treatmentsUsedEl = $('#modal-doc-treatments-used');
         if (todaySessions.length === 0) {
             treatmentsUsedEl.innerHTML = `<span class="text-gray-500">لا توجد مواد مستخدمة اليوم</span>`;
@@ -475,7 +520,6 @@
             `).join('');
         }
 
-        // 2. List of Today's Patients
         const patientsTodayEl = $('#modal-doc-patients-today');
         if (todaySessions.length === 0) {
             patientsTodayEl.innerHTML = `<span class="text-gray-500">لا يوجد مرضى مسجلين اليوم</span>`;
@@ -491,7 +535,6 @@
             `).join('');
         }
 
-        // 3. Previous and Upcoming Appointment Schedules
         const apptsEl = $('#modal-doc-appointments-list');
         if (allDocSessions.length === 0) {
             apptsEl.innerHTML = `<div class="p-4 text-center text-gray-500">لا توجد مواعيد مسجلة</div>`;
@@ -542,12 +585,11 @@
         }
     }
 
-    // ==================== 4. CENTRAL TREATMENTS CATALOG & PRICE EDITING ====================
+    // ==================== 4. CENTRAL TREATMENTS CATALOG ====================
     function renderTreatments() {
         const tbody = $('#treatments-table-body');
         const select = $('#pt-treatment-select');
 
-        // 1. Render Admin Catalog Table
         if (tbody) {
             if (State.treatments.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500">لا توجد علاجات في الكتالوج المركزي</td></tr>`;
@@ -561,13 +603,9 @@
                             <td class="p-4 font-mono text-amber-400 font-bold">${stock} وحدة</td>
                             <td class="p-4 text-gray-400 font-mono text-[11px]">${formatDate(t.createdAt)}</td>
                             <td class="p-4 text-center">
-                                <div class="flex items-center justify-center gap-1.5">
-                                    <button class="btn btn-ghost py-1 px-2.5 text-xs text-cyan-400" title="تعديل السعر والمخزون" onclick="window.ClinicEngine.openEditTreatmentModal('${t.id}')">
-                                        ✎ تعديل
-                                    </button>
-                                    <button class="btn btn-ghost py-1 px-2 text-xs text-pink-500 border-pink-500/30" title="حذف" onclick="window.ClinicEngine.deleteTreatment('${t.id}')">
-                                        🗑
-                                    </button>
+                                <div class="flex items-center justify-center gap-2">
+                                    <button class="action-capsule" title="تعديل السعر والمخزون" onclick="window.ClinicEngine.openEditTreatmentModal('${t.id}')">✎</button>
+                                    <button class="action-capsule danger" title="حذف" onclick="window.ClinicEngine.deleteTreatment('${t.id}')">🗑</button>
                                 </div>
                             </td>
                         </tr>
@@ -576,7 +614,6 @@
             }
         }
 
-        // 2. Real-Time Sync to Doctor Mobile Dropdown
         if (select) {
             const currentSelected = select.value;
             select.innerHTML = '<option value="">-- اختر نوع العلاج من الكتالوج المركزي --</option>' +
@@ -587,7 +624,6 @@
                 `).join('');
         }
 
-        // Also refresh consumed products section
         renderConsumedProducts();
     }
 
@@ -695,9 +731,7 @@
                         ${remaining} وحدة
                     </td>
                     <td class="p-4 text-center">
-                        <button class="btn btn-ghost py-1 px-3 text-xs text-amber-400 border-amber-500/30" onclick="window.ClinicEngine.openConsumedDetails('${t.id}', '${escapeHtml(t.name)}')">
-                            🔍 تفاصيل الاستهلاك
-                        </button>
+                        <button class="action-capsule" title="تفاصيل الاستهلاك" onclick="window.ClinicEngine.openConsumedDetails('${t.id}', '${escapeHtml(t.name)}')">🔍</button>
                     </td>
                 </tr>
             `;
@@ -734,7 +768,6 @@
         const container = $('#patients-registry-grid');
         if (!container) return;
 
-        // Group sessions by patient Phone or Name
         const patientsMap = {};
         State.sessions.forEach(s => {
             const key = (s.patientPhone || s.patientName || '').trim();
@@ -784,9 +817,7 @@
                             <span class="text-xs text-cyan-400 font-mono">${escapeHtml(p.phone)}</span>
                         </div>
                     </div>
-                    <button class="btn btn-ghost py-1 px-2.5 text-xs text-emerald-400 border-emerald-500/30" title="مراسلة واتساب" onclick="window.ClinicEngine.quickWhatsAppPatient('${escapeHtml(p.phone)}', '${escapeHtml(p.name)}')">
-                        💬 واتساب
-                    </button>
+                    <button class="action-capsule success" title="مراسلة واتساب" onclick="window.ClinicEngine.quickWhatsAppPatient('${escapeHtml(p.phone)}', '${escapeHtml(p.name)}')">💬</button>
                 </div>
 
                 <div class="space-y-1.5 text-xs text-gray-300 font-tajawal mb-3 pt-2 border-t border-white/5">
@@ -850,14 +881,11 @@
                 <td class="p-3.5 text-gray-400 font-mono text-[11px]">${formatDate(s.session1Date || s.createdAt)}</td>
                 <td class="p-3.5 text-cyan-400 font-mono text-[11px]">${formatDate(s.session2Date)}</td>
                 <td class="p-3.5 text-center">
-                    <button class="btn btn-ghost py-1 px-2.5 text-xs text-pink-500 border-pink-500/30" title="حذف الجلسة للأرشيف" onclick="window.ClinicEngine.deleteSession('${s.id}')">
-                        🗑 حذف للأرشيف
-                    </button>
+                    <button class="action-capsule danger" title="حذف الجلسة للأرشيف" onclick="window.ClinicEngine.deleteSession('${s.id}')">🗑</button>
                 </td>
             </tr>
         `).join('');
 
-        // Also refresh patients registry
         renderPatientsRegistry();
     }
 
@@ -1044,15 +1072,15 @@
         renderActivities();
     }
 
-    // ==================== 10. DOCTOR PORTAL & WHATSAPP AUTOMATION ====================
+    // ==================== 10. DOCTOR PORTAL ====================
     function renderDoctorDashboard() {
         if (!State.currentUser || State.currentUser.role !== 'doctor') return;
 
         const mySessionsToday = getDoctorTodaySessions(State.currentUser.uid);
         const myRevToday = mySessionsToday.reduce((sum, s) => sum + (Number(s.finalPrice) || 0), 0);
 
-        $('#doc-stat-today-revenue').textContent = fmt(myRevToday);
-        $('#doc-stat-today-patients').textContent = mySessionsToday.length;
+        countUp('#doc-stat-today-revenue', myRevToday);
+        countUp('#doc-stat-today-patients', mySessionsToday.length);
 
         const list = $('#doctor-patients-list');
         if (mySessionsToday.length === 0) {
@@ -1113,7 +1141,6 @@
         }
     }
 
-    // Submit Patient Session with Automated WhatsApp Message
     async function submitPatientSession() {
         if (!State.currentUser || State.currentUser.role !== 'doctor') {
             toast('جلسة الطبيب غير صالحة', 'error');
@@ -1139,7 +1166,6 @@
         const formattedNow = formatDate(nowIso);
         const formattedSession2 = formatDate(session2Date);
 
-        // Required Exact Template Message
         const notificationText = 
 `مرحباً بك في عيادة الدكتور ${State.currentUser.name}
 اسم المريض: ${patientName}
@@ -1168,14 +1194,10 @@
 
         try {
             await window.MedicalFirebase.recordPatientSessionCloud(sessionPayload);
-
             closeAddPatientFullScreen();
             renderDoctorDashboard();
             toast('تم حفظ الجلسة بنجاح ✓ جارِ فتح WhatsApp تلقائياً...', 'success');
-
-            // Automatic WhatsApp Dispatch to Patient Phone
             triggerWhatsAppDispatch(patientPhone, notificationText);
-
         } catch (err) {
             console.error('Session Save Error:', err);
             toast('فشل الحفظ في السحابة: ' + (err.message || 'خطأ غير متوقع'), 'error');
@@ -1205,9 +1227,14 @@
 
     // ==================== 11. LIFECYCLE & SYNC PIPELINE ====================
     async function initSystem() {
+        showGridSkeleton('quick-doctors-grid', 3);
+        showGridSkeleton('doctors-cards-grid', 6);
+        showTableSkeleton('treatments-table-body', 5);
+        showTableSkeleton('all-sessions-table-body', 5);
+        showTableSkeleton('consumed-products-table-body', 5);
+
         await window.MedicalFirebase.init();
 
-        // Restore active session
         const cachedSession = localStorage.getItem('medinexus_session');
         if (cachedSession) {
             try {
@@ -1218,7 +1245,6 @@
             }
         }
 
-        // Real-Time Subscriptions
         window.MedicalFirebase.subscribeFinances(data => {
             State.finances = data || { dailyTotal: 0, monthlyTotal: 0 };
             renderFinances();
@@ -1232,7 +1258,7 @@
         window.MedicalFirebase.subscribeDoctors(list => {
             State.doctors = list || [];
             renderDoctors();
-            renderFinances(); // updates active doctors count
+            renderFinances();
 
             if (State.currentUser && State.currentUser.role === 'doctor') {
                 const liveMe = State.doctors.find(d => d.uid === State.currentUser.uid);
@@ -1268,13 +1294,11 @@
             renderActivities();
         });
 
-        // Live Clock
         setInterval(() => {
             const clockEl = $('#live-clock');
             if (clockEl) clockEl.textContent = new Date().toLocaleTimeString('en-GB');
         }, 1000);
 
-        // Escape Key Modal Dismissal
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') {
                 ['modal-add-doctor', 'modal-doctor-details', 'modal-add-treatment', 'modal-edit-treatment', 'modal-consumed-details', 'modal-add-debt', 'modal-sys-alert', 'modal-sys-confirm'].forEach(id => closeModal(id));
@@ -1288,7 +1312,6 @@
         console.log('%c🚀 MEDINEXUS PRO Master Architecture Online', 'color:#00F0FF;font-weight:900');
     }
 
-    // Public Surface Bindings
     window.ClinicEngine = {
         openDrawer, closeDrawer,
         handleGlobalLogin, handleGlobalLogout,

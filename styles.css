@@ -1,5 +1,5 @@
 /* ==================================================================
-   MEDINEXUS PRO — Sleek Ultra-Glassmorphism & Medical Cyber Design
+   MEDINEXUS PRO — Liquid Glass & Cosmic Cyber Design System v2.0
    ================================================================== */
 
 *, *::before, *::after {
@@ -11,84 +11,108 @@
 
 :root {
     --bg-deep: #070b19;
+    --bg-nebula: #0f0c20;
+    --bg-obsidian: #03040b;
     --bg-surface: #0a1026;
+
     --medical-cyan: #00F0FF;
     --medical-blue: #2563EB;
-    --medical-emerald: #00FF88;
+    --medical-emerald: #00FF9D;
     --medical-pink: #FF007A;
     --medical-amber: #FBBF24;
     --medical-violet: #8B5CF6;
     --medical-rose: #F43F5E;
+
     --text-primary: #FFFFFF;
     --text-muted: #8E9BB2;
 
-    /* Frosted Glass Tokens */
-    --glass-bg: rgba(255, 255, 255, 0.05);
-    --glass-border: rgba(255, 255, 255, 0.12);
-    --glass-border-hover: rgba(0, 240, 255, 0.45);
-    --glass-blur: blur(16px) saturate(180%);
-    --glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+    --glass-fill: rgba(18, 22, 45, 0.45);
+    --glass-fill-hover: rgba(24, 30, 58, 0.55);
+    --glass-edge: rgba(0, 240, 255, 0.15);
+    --glass-edge-hover: rgba(0, 240, 255, 0.5);
+    --glass-blur: blur(20px) saturate(180%);
+    --glass-shadow:
+        0 16px 40px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        inset 0 -1px 0 rgba(0, 240, 255, 0.04);
 
-    /* Mobile Doctor Portal Glass Card */
-    --doc-card-bg: rgba(255, 255, 255, 0.06);
-    --doc-card-border: rgba(0, 240, 255, 0.22);
+    --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --smooth: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 html, body {
     background-color: var(--bg-deep);
     color: var(--text-primary);
-    font-family: 'Tajawal', sans-serif;
+    font-family: 'Tajawal', 'Cairo', sans-serif;
     overflow-x: hidden;
     min-height: 100vh;
     overscroll-behavior: none;
     direction: rtl;
     user-select: none;
     -webkit-user-select: none;
+    font-feature-settings: "ss01", "cv01";
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
 }
 
-/* ==================== 1. GLOBAL LOGIN GATEWAY ==================== */
+/* ==================== LOGIN GATEWAY ==================== */
 
 .global-login-overlay {
     position: fixed;
     inset: 0;
     z-index: 9999;
-    background: radial-gradient(circle at center, rgba(14, 24, 56, 0.95) 0%, rgba(7, 11, 25, 0.98) 100%);
+    background: radial-gradient(circle at center, rgba(15, 12, 32, 0.95) 0%, rgba(3, 4, 11, 0.98) 100%);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 16px;
-    animation: fadeIn 0.3s ease-out;
+    animation: fadeIn 0.35s var(--smooth);
 }
 
 .glass-login-box {
-    background: var(--glass-bg);
+    background: var(--glass-fill);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
-    border-radius: 28px;
-    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 35px rgba(0, 240, 255, 0.2);
+    border: 1px solid var(--glass-edge);
+    border-radius: 30px;
+    box-shadow:
+        0 30px 70px rgba(0, 0, 0, 0.75),
+        0 0 60px rgba(0, 240, 255, 0.15),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
     position: relative;
-    animation: loginScaleIn 0.35s cubic-bezier(0.34, 1.4, 0.64, 1);
+    overflow: hidden;
+    animation: loginScaleIn 0.55s var(--spring);
 }
 
 .glass-login-box::before {
     content: '';
     position: absolute;
     top: 0;
-    left: 10%;
-    right: 10%;
+    left: 8%;
+    right: 8%;
     height: 2px;
-    background: linear-gradient(90deg, transparent, var(--medical-cyan), var(--medical-blue), transparent);
+    background: linear-gradient(90deg, transparent, var(--medical-cyan), var(--medical-violet), transparent);
+    filter: blur(0.4px);
+}
+
+.glass-login-box::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, transparent 35%, transparent 65%, rgba(0, 240, 255, 0.05) 100%);
+    pointer-events: none;
 }
 
 @keyframes loginScaleIn {
-    from { opacity: 0; transform: scale(0.92) translateY(20px); }
-    to { opacity: 1; transform: scale(1) translateY(0); }
+    0% { opacity: 0; transform: scale(0.88) translateY(30px); }
+    60% { opacity: 1; transform: scale(1.02) translateY(-4px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-/* ==================== 2. LIGHTWEIGHT 3D CANVAS & AMBIENT GLOW ==================== */
+/* ==================== COSMIC CANVAS BACKDROP ==================== */
 
 #space-canvas {
     position: fixed;
@@ -97,6 +121,9 @@ html, body {
     height: 100vh;
     z-index: -3;
     pointer-events: none;
+    will-change: transform;
+    transform: translateZ(0);
+    backface-visibility: hidden;
 }
 
 .bg-orbs {
@@ -111,14 +138,14 @@ html, body {
     position: absolute;
     border-radius: 50%;
     filter: blur(120px);
-    opacity: 0.25;
+    opacity: 0.28;
     will-change: transform;
-    transition: transform 0.8s cubic-bezier(0.34, 1.2, 0.64, 1);
+    transition: transform 0.8s var(--smooth);
 }
 
 .orb-1 { width: 500px; height: 500px; background: radial-gradient(circle, var(--medical-cyan) 0%, transparent 70%); top: -10%; right: -10%; }
 .orb-2 { width: 450px; height: 450px; background: radial-gradient(circle, var(--medical-blue) 0%, transparent 70%); bottom: -15%; left: -10%; }
-.orb-3 { width: 350px; height: 350px; background: radial-gradient(circle, var(--medical-emerald) 0%, transparent 70%); top: 45%; left: 20%; opacity: 0.16; }
+.orb-3 { width: 350px; height: 350px; background: radial-gradient(circle, var(--medical-violet) 0%, transparent 70%); top: 45%; left: 20%; opacity: 0.18; }
 
 .bg-grid-medical {
     position: fixed;
@@ -126,12 +153,12 @@ html, body {
     z-index: -2;
     background-image:
         linear-gradient(rgba(0, 240, 255, 0.035) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(37, 99, 235, 0.035) 1px, transparent 1px);
+        linear-gradient(90deg, rgba(139, 92, 246, 0.035) 1px, transparent 1px);
     background-size: 50px 50px;
-    mask-image: radial-gradient(circle at 50% 50%, #000 20%, transparent 80%);
-    -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 20%, transparent 80%);
+    mask-image: radial-gradient(circle at 50% 50%, #000 15%, transparent 75%);
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 15%, transparent 75%);
     pointer-events: none;
-    animation: gridFlow 30s linear infinite;
+    animation: gridFlow 40s linear infinite;
 }
 
 @keyframes gridFlow {
@@ -143,21 +170,21 @@ html, body {
     position: fixed;
     inset: 0;
     z-index: -2;
-    background: radial-gradient(ellipse at center, transparent 30%, rgba(7, 11, 25, 0.95) 100%);
+    background: radial-gradient(ellipse at center, transparent 25%, rgba(3, 4, 11, 0.96) 100%);
     pointer-events: none;
 }
 
-/* ==================== 3. MASTER HEADER & NAVIGATION ==================== */
+/* ==================== APP HEADER (LIQUID GLASS) ==================== */
 
 .app-header {
     position: sticky;
     top: 0;
     z-index: 100;
-    background: rgba(7, 11, 25, 0.85);
+    background: rgba(7, 11, 25, 0.82);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    border-bottom: 1px solid var(--glass-border);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+    border-bottom: 1px solid var(--glass-edge);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), inset 0 -1px 0 rgba(0, 240, 255, 0.06);
 }
 
 .header-bar {
@@ -166,19 +193,20 @@ html, body {
     left: 0;
     right: 0;
     height: 2px;
-    background: linear-gradient(90deg, transparent, var(--medical-cyan), var(--medical-emerald), transparent);
+    background: linear-gradient(90deg, transparent, var(--medical-cyan), var(--medical-emerald), var(--medical-violet), transparent);
+    filter: blur(0.3px);
     animation: headerPulse 5s ease-in-out infinite;
 }
 
 @keyframes headerPulse {
-    0%, 100% { opacity: 0.4; transform: scaleX(0.8); }
+    0%, 100% { opacity: 0.45; transform: scaleX(0.85); }
     50% { opacity: 1; transform: scaleX(1); }
 }
 
 .hamburger {
     width: 42px;
     height: 42px;
-    border-radius: 12px;
+    border-radius: 14px;
     background: rgba(0, 240, 255, 0.08);
     border: 1px solid rgba(0, 240, 255, 0.25);
     display: flex;
@@ -187,7 +215,7 @@ html, body {
     justify-content: center;
     gap: 5px;
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
+    transition: all 0.35s var(--spring);
 }
 
 .hamburger span {
@@ -196,17 +224,17 @@ html, body {
     height: 2px;
     background: var(--medical-cyan);
     border-radius: 2px;
-    box-shadow: 0 0 8px var(--medical-cyan);
+    box-shadow: 0 0 10px var(--medical-cyan);
     transition: all 0.25s;
 }
 
 .hamburger:hover {
     background: rgba(0, 240, 255, 0.2);
-    transform: scale(1.05);
-    box-shadow: 0 0 20px rgba(0, 240, 255, 0.35);
+    transform: scale(1.06);
+    box-shadow: 0 0 25px rgba(0, 240, 255, 0.4);
 }
 
-/* ==================== 4. SYSTEM STATUS INDICATORS ==================== */
+/* ==================== STATUS INDICATORS ==================== */
 
 .fb-status {
     display: inline-flex;
@@ -217,10 +245,9 @@ html, body {
     letter-spacing: 0.08em;
     font-weight: 800;
     padding: 3px 9px;
-    border-radius: 8px;
-    background: rgba(0, 0, 0, 0.5);
-    border: 1px solid var(--glass-border);
-    user-select: none;
+    border-radius: 9px;
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid var(--glass-edge);
 }
 
 .fb-dot {
@@ -228,10 +255,10 @@ html, body {
     height: 6px;
     border-radius: 50%;
     background: #666;
-    box-shadow: 0 0 6px currentColor;
+    box-shadow: 0 0 8px currentColor;
 }
 
-.fb-status.online { color: var(--medical-emerald); border-color: rgba(0, 255, 136, 0.35); }
+.fb-status.online { color: var(--medical-emerald); border-color: rgba(0, 255, 157, 0.35); }
 .fb-status.online .fb-dot { background: var(--medical-emerald); animation: pulseAnim 1.6s ease-in-out infinite; }
 .fb-status.sync { color: var(--medical-amber); border-color: rgba(251, 191, 36, 0.35); }
 .fb-status.sync .fb-dot { background: var(--medical-amber); }
@@ -246,7 +273,7 @@ html, body {
     position: relative;
     background: var(--medical-emerald);
     color: var(--medical-emerald);
-    box-shadow: 0 0 10px currentColor;
+    box-shadow: 0 0 12px currentColor;
 }
 
 .pulse-dot::after {
@@ -268,7 +295,7 @@ html, body {
     100% { transform: scale(2.2); opacity: 0; }
 }
 
-/* ==================== 5. BUTTONS & UI CONTROLS ==================== */
+/* ==================== BUTTONS (NEON SPRING) ==================== */
 
 .btn {
     display: inline-flex;
@@ -282,53 +309,65 @@ html, body {
     font-size: 13px;
     border: none;
     cursor: pointer;
-    transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s, background 0.25s;
+    transition: transform 0.28s var(--spring), box-shadow 0.3s, background 0.3s;
     user-select: none;
     white-space: nowrap;
     position: relative;
     overflow: hidden;
 }
 
-.btn:active {
-    transform: scale(0.96);
+.btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+    transition: left 0.6s ease;
+    pointer-events: none;
 }
+
+.btn:hover::before { left: 100%; }
+
+.btn:active { transform: scale(0.96); }
 
 .btn-primary {
     background: linear-gradient(135deg, var(--medical-blue) 0%, var(--medical-cyan) 100%);
     color: #ffffff;
-    box-shadow: 0 4px 22px rgba(0, 240, 255, 0.35);
+    box-shadow: 0 4px 22px rgba(0, 240, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .btn-primary:hover {
-    box-shadow: 0 8px 30px rgba(0, 240, 255, 0.55);
+    box-shadow: 0 10px 35px rgba(0, 240, 255, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.3);
     transform: translateY(-2px);
 }
 
 .btn-success {
     background: linear-gradient(135deg, #059669 0%, var(--medical-emerald) 100%);
     color: #032b1a;
-    box-shadow: 0 4px 22px rgba(0, 255, 136, 0.35);
+    box-shadow: 0 4px 22px rgba(0, 255, 157, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .btn-success:hover {
-    box-shadow: 0 8px 30px rgba(0, 255, 136, 0.55);
+    box-shadow: 0 10px 35px rgba(0, 255, 157, 0.65);
     transform: translateY(-2px);
 }
 
 .btn-danger {
     background: linear-gradient(135deg, #dc2626 0%, var(--medical-pink) 100%);
     color: #ffffff;
-    box-shadow: 0 4px 22px rgba(255, 0, 122, 0.35);
+    box-shadow: 0 4px 22px rgba(255, 0, 122, 0.4);
 }
 
 .btn-danger:hover {
-    box-shadow: 0 8px 30px rgba(255, 0, 122, 0.55);
+    box-shadow: 0 10px 35px rgba(255, 0, 122, 0.65);
     transform: translateY(-2px);
 }
 
 .btn-ghost {
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
+    background: var(--glass-fill);
+    border: 1px solid var(--glass-edge);
     color: #ffffff;
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
@@ -338,7 +377,7 @@ html, body {
     background: rgba(0, 240, 255, 0.12);
     border-color: var(--medical-cyan);
     color: var(--medical-cyan);
-    box-shadow: 0 0 20px rgba(0, 240, 255, 0.25);
+    box-shadow: 0 0 25px rgba(0, 240, 255, 0.3);
 }
 
 .back-btn {
@@ -353,55 +392,71 @@ html, body {
     font-weight: 800;
     font-size: 14px;
     cursor: pointer;
-    transition: all 0.25s;
+    transition: all 0.3s var(--spring);
 }
 
 .back-btn:hover {
     background: rgba(0, 240, 255, 0.22);
     transform: translateX(4px);
-    box-shadow: 0 0 25px rgba(0, 240, 255, 0.35);
+    box-shadow: 0 0 25px rgba(0, 240, 255, 0.4);
 }
 
-/* ==================== 6. ULTRA-GLASSMORPHIC SURFACES ==================== */
+/* ==================== LIQUID GLASS SURFACES ==================== */
 
 .glass {
-    background: var(--glass-bg);
+    background: var(--glass-fill);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
+    border: 1px solid var(--glass-edge);
     border-radius: 24px;
     position: relative;
     overflow: hidden;
     box-shadow: var(--glass-shadow);
-    transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+    transition: all 0.5s var(--spring);
 }
 
 .glass::before {
     content: '';
     position: absolute;
     top: 0;
-    left: 10%;
-    right: 10%;
+    left: 15%;
+    right: 15%;
     height: 1.5px;
-    background: linear-gradient(90deg, transparent, var(--medical-cyan), transparent);
+    background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.85), rgba(139, 92, 246, 0.5), transparent);
+    filter: blur(0.3px);
     pointer-events: none;
 }
 
+.glass::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0%, transparent 38%, transparent 62%, rgba(0, 240, 255, 0.05) 100%);
+    pointer-events: none;
+    opacity: 0.7;
+}
+
 .glass:hover {
-    border-color: var(--glass-border-hover);
-    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.65), 0 0 25px rgba(0, 240, 255, 0.15);
+    border-color: var(--glass-edge-hover);
+    background: var(--glass-fill-hover);
+    transform: translateY(-3px);
+    box-shadow:
+        0 22px 50px rgba(0, 0, 0, 0.65),
+        0 0 30px rgba(0, 240, 255, 0.18),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .glass-doctor-card {
-    background: var(--doc-card-bg);
+    background: var(--glass-fill);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--doc-card-border);
+    border: 1px solid var(--glass-edge);
     border-radius: 24px;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
-    transition: all 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transition: all 0.5s var(--spring);
 }
 
 .glass-doctor-card::before {
@@ -412,19 +467,20 @@ html, body {
     right: 8%;
     height: 2px;
     background: linear-gradient(90deg, transparent, var(--medical-cyan), var(--medical-blue), transparent);
+    filter: blur(0.3px);
 }
 
-/* ==================== 7. STATS CARDS & MODULES ==================== */
+/* ==================== STATS CARDS (COUNTUP) ==================== */
 
 .stat-card {
     position: relative;
     padding: 24px 22px;
     border-radius: 22px;
-    background: var(--glass-bg);
+    background: var(--glass-fill);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
-    transition: transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1), box-shadow 0.3s;
+    border: 1px solid var(--glass-edge);
+    transition: transform 0.5s var(--spring), box-shadow 0.4s, border-color 0.3s;
     overflow: hidden;
 }
 
@@ -433,7 +489,7 @@ html, body {
     position: absolute;
     inset: 0;
     background: radial-gradient(circle at top right, currentColor 0%, transparent 65%);
-    opacity: 0.15;
+    opacity: 0.14;
     pointer-events: none;
 }
 
@@ -445,15 +501,17 @@ html, body {
     right: 0;
     height: 3px;
     background: linear-gradient(90deg, transparent, currentColor, transparent);
-    box-shadow: 0 0 15px currentColor;
+    box-shadow: 0 0 18px currentColor;
+    filter: blur(0.4px);
 }
 
 .stat-card:hover {
     transform: translateY(-6px) scale(1.02);
-    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.65), 0 0 45px currentColor;
+    border-color: currentColor;
+    box-shadow: 0 28px 65px rgba(0, 0, 0, 0.7), 0 0 50px currentColor;
 }
 
-.stat-emerald { color: var(--medical-emerald); border-color: rgba(0, 255, 136, 0.35); }
+.stat-emerald { color: var(--medical-emerald); border-color: rgba(0, 255, 157, 0.35); }
 .stat-cyan { color: var(--medical-cyan); border-color: rgba(0, 240, 255, 0.35); }
 .stat-pink { color: var(--medical-pink); border-color: rgba(255, 0, 122, 0.35); }
 .stat-violet { color: var(--medical-violet); border-color: rgba(139, 92, 246, 0.4); }
@@ -467,17 +525,20 @@ html, body {
     display: inline-block;
     padding: 3px 9px;
     border-radius: 6px;
-    background: rgba(0, 0, 0, 0.4);
+    background: rgba(0, 0, 0, 0.45);
     border: 1px solid currentColor;
+    box-shadow: 0 0 12px currentColor;
 }
 
 .stat-num {
     font-family: 'Orbitron', monospace;
     font-weight: 900;
-    font-size: 32px;
+    font-size: 34px;
     color: #ffffff;
     line-height: 1.1;
-    text-shadow: 0 0 25px currentColor;
+    text-shadow: 0 0 25px currentColor, 0 0 45px currentColor;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
 }
 
 .stat-unit {
@@ -487,51 +548,106 @@ html, body {
     letter-spacing: 0.12em;
 }
 
-/* ==================== 8. DOCTOR INTERACTIVE CARDS ==================== */
+/* ==================== DOCTOR CARDS (3D AVATAR RING) ==================== */
 
 .doctor-item-card {
     padding: 22px;
-    border-radius: 20px;
-    background: var(--glass-bg);
+    border-radius: 22px;
+    background: var(--glass-fill);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
-    transition: all 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
+    border: 1px solid var(--glass-edge);
+    transition: all 0.5s var(--spring);
     position: relative;
     overflow: hidden;
 }
 
+.doctor-item-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20%;
+    right: 20%;
+    height: 1.5px;
+    background: linear-gradient(90deg, transparent, var(--medical-cyan), transparent);
+    filter: blur(0.4px);
+}
+
 .doctor-item-card.frozen {
     border-color: rgba(255, 0, 122, 0.4);
-    background: rgba(45, 15, 25, 0.25);
+    background: rgba(45, 15, 25, 0.28);
+    opacity: 0.85;
 }
 
 .doctor-item-card:hover {
     border-color: var(--medical-cyan);
     transform: translateY(-5px);
-    box-shadow: 0 16px 45px rgba(0, 0, 0, 0.6), 0 0 25px rgba(0, 240, 255, 0.2);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.65), 0 0 30px rgba(0, 240, 255, 0.22);
+}
+
+.avatar-3d {
+    position: relative;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    isolation: isolate;
+}
+
+.avatar-3d::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, #00F0FF, #8B5CF6, #00FF9D, #00F0FF);
+    animation: avatarSpin 6s linear infinite;
+    z-index: 0;
+    filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.55));
+}
+
+.avatar-3d::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: rgba(10, 16, 38, 0.95);
+    z-index: 1;
+    box-shadow: inset 0 0 20px rgba(0, 240, 255, 0.15);
+}
+
+.avatar-3d > * {
+    position: relative;
+    z-index: 2;
+}
+
+@keyframes avatarSpin {
+    to { transform: rotate(360deg); }
 }
 
 .btn-delete-doc {
-    width: 32px;
-    height: 32px;
-    border-radius: 10px;
-    background: rgba(255, 0, 122, 0.12);
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+    background: rgba(255, 0, 122, 0.1);
     border: 1px solid rgba(255, 0, 122, 0.3);
     color: var(--medical-pink);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s var(--spring);
+    box-shadow: 0 0 12px rgba(255, 0, 122, 0.15);
 }
 
 .btn-delete-doc:hover {
     background: rgba(255, 0, 122, 0.3);
-    transform: scale(1.1);
+    transform: scale(1.12) translateY(-2px);
+    box-shadow: 0 0 25px rgba(255, 0, 122, 0.55);
 }
 
-/* Freeze Toggle */
 .switch-container {
     display: inline-flex;
     align-items: center;
@@ -547,12 +663,14 @@ html, body {
     border: 1px solid rgba(255, 0, 122, 0.6);
     border-radius: 999px;
     position: relative;
-    transition: all 0.3s;
+    transition: all 0.4s var(--spring);
+    box-shadow: 0 0 12px rgba(255, 0, 122, 0.2);
 }
 
 .switch-track.active {
-    background: rgba(0, 255, 136, 0.35);
-    border-color: rgba(0, 255, 136, 0.6);
+    background: rgba(0, 255, 157, 0.35);
+    border-color: rgba(0, 255, 157, 0.7);
+    box-shadow: 0 0 15px rgba(0, 255, 157, 0.35);
 }
 
 .switch-thumb {
@@ -563,53 +681,115 @@ html, body {
     position: absolute;
     top: 2px;
     right: 3px;
-    transition: transform 0.3s cubic-bezier(0.34, 1.5, 0.64, 1);
+    transition: transform 0.4s var(--spring);
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
 }
 
 .switch-track.active .switch-thumb {
     transform: translateX(-20px);
     background: var(--medical-emerald);
-    box-shadow: 0 0 10px var(--medical-emerald);
+    box-shadow: 0 0 14px var(--medical-emerald);
 }
 
-/* ==================== 9. PATIENT REGISTRY & CONSUMED PRODUCTS ==================== */
+/* ==================== NEON ACTION CAPSULES ==================== */
+
+.action-capsule {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+    background: rgba(0, 240, 255, 0.1);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.18), inset 0 0 10px rgba(0, 240, 255, 0.08);
+    cursor: pointer;
+    transition: all 0.3s var(--spring);
+    color: var(--medical-cyan);
+    font-size: 15px;
+}
+
+.action-capsule:hover {
+    background: rgba(0, 240, 255, 0.28);
+    transform: translateY(-2px) scale(1.1);
+    box-shadow: 0 0 24px rgba(0, 240, 255, 0.6), inset 0 0 14px rgba(0, 240, 255, 0.25);
+    border-color: var(--medical-cyan);
+}
+
+.action-capsule.danger {
+    color: var(--medical-pink);
+    border-color: rgba(255, 0, 122, 0.3);
+    background: rgba(255, 0, 122, 0.1);
+    box-shadow: 0 0 12px rgba(255, 0, 122, 0.18);
+}
+
+.action-capsule.danger:hover {
+    background: rgba(255, 0, 122, 0.28);
+    box-shadow: 0 0 24px rgba(255, 0, 122, 0.6);
+    border-color: var(--medical-pink);
+}
+
+.action-capsule.success {
+    color: var(--medical-emerald);
+    border-color: rgba(0, 255, 157, 0.3);
+    background: rgba(0, 255, 157, 0.1);
+}
+
+.action-capsule.success:hover {
+    background: rgba(0, 255, 157, 0.28);
+    box-shadow: 0 0 24px rgba(0, 255, 157, 0.55);
+    border-color: var(--medical-emerald);
+}
+
+/* ==================== PATIENT CARDS ==================== */
 
 .patient-card {
     padding: 18px;
-    border-radius: 18px;
-    background: var(--glass-bg);
+    border-radius: 20px;
+    background: var(--glass-fill);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
-    transition: all 0.25s;
+    border: 1px solid var(--glass-edge);
+    transition: all 0.4s var(--spring);
     position: relative;
+    overflow: hidden;
+}
+
+.patient-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 25%;
+    right: 25%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--medical-cyan), transparent);
 }
 
 .patient-card:hover {
     border-color: var(--medical-cyan);
     transform: translateY(-4px);
-    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 240, 255, 0.15);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.55), 0 0 25px rgba(0, 240, 255, 0.2);
 }
 
-/* Consumed Progress Bar */
 .stock-bar-wrap {
     width: 100%;
     height: 6px;
     border-radius: 99px;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.08);
     overflow: hidden;
     margin-top: 6px;
+    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.5);
 }
 
 .stock-bar-fill {
     height: 100%;
     border-radius: 99px;
     background: linear-gradient(90deg, var(--medical-cyan), var(--medical-emerald));
-    transition: width 0.4s ease-out;
+    transition: width 0.6s var(--smooth);
+    box-shadow: 0 0 12px currentColor;
 }
 
-/* ==================== 10. INPUT CONTROLS ==================== */
+/* ==================== INPUTS (GLOWING FOCUS) ==================== */
 
 .inp {
     width: 100%;
@@ -621,18 +801,21 @@ html, body {
     font-size: 14px;
     font-family: 'Tajawal', sans-serif;
     font-weight: 600;
-    transition: all 0.2s;
+    transition: all 0.3s var(--spring);
     outline: none;
 }
 
 .inp:focus {
     border-color: var(--medical-cyan);
-    box-shadow: 0 0 0 3px rgba(0, 240, 255, 0.15), 0 0 20px rgba(0, 240, 255, 0.25);
+    background: rgba(0, 240, 255, 0.06);
+    box-shadow:
+        0 0 0 3px rgba(0, 240, 255, 0.18),
+        0 0 25px rgba(0, 240, 255, 0.35),
+        inset 0 0 15px rgba(0, 240, 255, 0.08);
+    transform: translateY(-1px);
 }
 
-.inp::placeholder {
-    color: #55627a;
-}
+.inp::placeholder { color: #55627a; }
 
 select.inp {
     appearance: none;
@@ -655,27 +838,28 @@ select.inp option {
     color: var(--medical-cyan);
     margin-bottom: 6px;
     font-family: 'Tajawal', sans-serif;
+    letter-spacing: 0.02em;
 }
 
-/* ==================== 11. FULL-SCREEN PATIENT FLOW ==================== */
+/* ==================== FULL-SCREEN PATIENT FLOW ==================== */
 
 .full-screen-flow {
     position: fixed;
     inset: 0;
     z-index: 250;
-    background: rgba(7, 11, 25, 0.96);
-    backdrop-filter: blur(28px);
-    -webkit-backdrop-filter: blur(28px);
+    background: rgba(3, 4, 11, 0.96);
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
     overflow-y: auto;
-    animation: flowSlideIn 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    animation: flowSlideIn 0.4s var(--spring);
 }
 
 @keyframes flowSlideIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    0% { opacity: 0; transform: translateY(30px) scale(0.98); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ==================== 12. BADGES ==================== */
+/* ==================== BADGES ==================== */
 
 .badge {
     display: inline-flex;
@@ -689,13 +873,13 @@ select.inp option {
     letter-spacing: 0.04em;
 }
 
-.badge-emerald { background: rgba(0, 255, 136, 0.15); color: var(--medical-emerald); border: 1px solid rgba(0, 255, 136, 0.35); }
+.badge-emerald { background: rgba(0, 255, 157, 0.15); color: var(--medical-emerald); border: 1px solid rgba(0, 255, 157, 0.35); }
 .badge-cyan { background: rgba(0, 240, 255, 0.15); color: var(--medical-cyan); border: 1px solid rgba(0, 240, 255, 0.35); }
 .badge-pink { background: rgba(255, 0, 122, 0.15); color: var(--medical-pink); border: 1px solid rgba(255, 0, 122, 0.35); }
 .badge-rose { background: rgba(244, 63, 94, 0.15); color: var(--medical-rose); border: 1px solid rgba(244, 63, 94, 0.4); }
 .badge-amber { background: rgba(251, 191, 36, 0.15); color: var(--medical-amber); border: 1px solid rgba(251, 191, 36, 0.4); }
 
-/* ==================== 13. DRAWER (OFF-CANVAS) ==================== */
+/* ==================== DRAWER (OFF-CANVAS) ==================== */
 
 .drawer {
     position: fixed;
@@ -705,38 +889,33 @@ select.inp option {
     max-width: 85vw;
     height: 100%;
     z-index: 300;
-    background: rgba(10, 16, 38, 0.9);
+    background: rgba(10, 16, 38, 0.92);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
-    border-left: 1px solid var(--glass-border);
+    border-left: 1px solid var(--glass-edge);
     transform: translateX(100%);
-    transition: transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1);
+    transition: transform 0.45s var(--spring);
     display: flex;
     flex-direction: column;
     padding: 24px;
     overflow-y: auto;
-    box-shadow: -20px 0 60px rgba(0, 0, 0, 0.7);
+    box-shadow: -25px 0 70px rgba(0, 0, 0, 0.75);
 }
 
-.drawer.open {
-    transform: translateX(0);
-}
+.drawer.open { transform: translateX(0); }
 
 .drawer-overlay {
     position: fixed;
     inset: 0;
     z-index: 290;
     background: rgba(0, 0, 0, 0.8);
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(10px);
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.3s;
+    transition: opacity 0.35s;
 }
 
-.drawer-overlay.show {
-    opacity: 1;
-    pointer-events: auto;
-}
+.drawer-overlay.show { opacity: 1; pointer-events: auto; }
 
 .nav-item {
     display: flex;
@@ -744,45 +923,56 @@ select.inp option {
     gap: 12px;
     padding: 13px 15px;
     border-radius: 14px;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
+    background: var(--glass-fill);
+    border: 1px solid var(--glass-edge);
     color: #94a3b8;
     font-weight: 700;
     font-size: 14px;
     cursor: pointer;
-    transition: all 0.25s;
+    transition: all 0.35s var(--spring);
     text-align: right;
     width: 100%;
 }
 
 .nav-item:hover {
-    background: rgba(0, 240, 255, 0.08);
+    background: rgba(0, 240, 255, 0.1);
     color: #ffffff;
-    border-color: rgba(0, 240, 255, 0.3);
-    transform: translateX(-4px);
+    border-color: rgba(0, 240, 255, 0.35);
+    transform: translateX(-5px);
 }
 
 .nav-item.active {
-    background: linear-gradient(90deg, rgba(37, 99, 235, 0.3), rgba(0, 240, 255, 0.15));
+    background: linear-gradient(90deg, rgba(37, 99, 235, 0.35), rgba(0, 240, 255, 0.18));
     color: var(--medical-cyan);
     border-color: var(--medical-cyan);
-    box-shadow: 0 0 25px rgba(0, 240, 255, 0.2);
+    box-shadow: 0 0 28px rgba(0, 240, 255, 0.28), inset 0 0 15px rgba(0, 240, 255, 0.08);
 }
 
-/* ==================== 14. MODALS & SYSTEM DIALOGS ==================== */
+/* ==================== MODALS (SPRING PHYSICS) ==================== */
 
 .modal-bd {
     position: fixed;
     inset: 0;
     z-index: 500;
-    background: rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.82);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     display: none;
     align-items: center;
     justify-content: center;
     padding: 16px;
-    animation: fadeIn 0.22s ease-out;
+    animation: fadeIn 0.25s ease-out;
+}
+
+.modal-bd[style*="flex"] > .glass-doctor-card,
+.modal-bd[style*="display: flex"] > .glass-doctor-card {
+    animation: modalSpring 0.6s var(--spring);
+}
+
+@keyframes modalSpring {
+    0% { opacity: 0; transform: scale(0.82) translateY(40px); }
+    55% { opacity: 1; transform: scale(1.03) translateY(-6px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 @keyframes fadeIn {
@@ -790,7 +980,7 @@ select.inp option {
     to { opacity: 1; }
 }
 
-/* ==================== 15. TOAST DISPATCHER ==================== */
+/* ==================== TOAST DISPATCHER ==================== */
 
 #toast-wrap {
     position: fixed;
@@ -810,10 +1000,10 @@ select.inp option {
     border-radius: 14px;
     font-weight: 800;
     font-size: 13px;
-    background: rgba(12, 18, 40, 0.94);
+    background: rgba(12, 18, 40, 0.95);
     backdrop-filter: blur(20px);
-    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.65);
-    animation: toastSlide 0.35s cubic-bezier(0.34, 1.5, 0.64, 1);
+    box-shadow: 0 20px 45px rgba(0, 0, 0, 0.7), 0 0 25px rgba(0, 240, 255, 0.15);
+    animation: toastSlide 0.45s var(--spring);
     max-width: 440px;
     border: 1px solid;
     position: relative;
@@ -831,28 +1021,94 @@ select.inp option {
     box-shadow: 0 0 15px currentColor;
 }
 
-.toast.success { color: var(--medical-emerald); border-color: rgba(0, 255, 136, 0.45); }
+.toast.success { color: var(--medical-emerald); border-color: rgba(0, 255, 157, 0.45); }
 .toast.error { color: var(--medical-pink); border-color: rgba(255, 0, 122, 0.45); }
 .toast.info { color: var(--medical-cyan); border-color: rgba(0, 240, 255, 0.45); }
 .toast.warn { color: var(--medical-amber); border-color: rgba(251, 191, 36, 0.45); }
 
 @keyframes toastSlide {
-    from { opacity: 0; transform: translateY(-25px) scale(0.9); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
+    0% { opacity: 0; transform: translateY(-30px) scale(0.85); }
+    60% { opacity: 1; transform: translateY(4px) scale(1.03); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ==================== 16. PORTALS & VIEW SWITCHERS ==================== */
+/* ==================== PORTALS & VIEW SWITCHERS ==================== */
 
 .portal-section { display: none; }
-.portal-section.active { display: block; animation: viewIn 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+.portal-section.active { display: block; animation: viewIn 0.45s var(--spring); }
 
 .admin-view { display: none; }
-.admin-view.active { display: block; animation: viewIn 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+.admin-view.active { display: block; animation: viewIn 0.45s var(--spring); }
 
 @keyframes viewIn {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
+    0% { opacity: 0; transform: translateY(18px) scale(0.99); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+/* ==================== SKELETON LOADERS ==================== */
+
+.skeleton {
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.03) 25%,
+        rgba(0, 240, 255, 0.09) 50%,
+        rgba(255, 255, 255, 0.03) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.6s linear infinite;
+    border-radius: 12px;
+    pointer-events: none;
+}
+
+.skeleton-row {
+    height: 52px;
+    margin-bottom: 10px;
+    border-radius: 14px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.02) 25%, rgba(0,240,255,0.07) 50%, rgba(255,255,255,0.02) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.6s linear infinite;
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* ==================== ACTIVITY LOG ITEMS ==================== */
+
+.activity-item {
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: var(--glass-fill);
+    border: 1px solid var(--glass-edge);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    transition: all 0.35s var(--spring);
+    position: relative;
+    overflow: hidden;
+}
+
+.activity-item::before {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 15%;
+    bottom: 15%;
+    width: 3px;
+    border-radius: 99px;
+}
+
+.activity-item:hover {
+    transform: translateX(-4px);
+    border-color: rgba(0, 240, 255, 0.35);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.activity-breach::before { background: var(--medical-pink); box-shadow: 0 0 12px var(--medical-pink); }
+.activity-session::before { background: var(--medical-cyan); box-shadow: 0 0 12px var(--medical-cyan); }
+.activity-financial::before { background: var(--medical-emerald); box-shadow: 0 0 12px var(--medical-emerald); }
 
 /* Utilities */
 .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -861,7 +1117,8 @@ select.inp option {
 .font-tajawal { font-family: 'Tajawal', sans-serif; }
 
 @media (max-width: 640px) {
-    .stat-num { font-size: 26px; }
+    .stat-num { font-size: 28px; }
     .drawer { padding: 18px; width: 300px; }
     .btn { padding: 10px 14px; font-size: 12px; }
+    .avatar-3d { width: 46px; height: 46px; font-size: 22px; }
 }

@@ -7,30 +7,29 @@
     <meta name="description" content="MEDINEXUS PRO - Ultra-Glassmorphism Clinic Management System">
     <title>MEDINEXUS PRO | نظام إدارة العيادات الطبية</title>
 
-    <!-- Web App Manifest -->
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🩺</text></svg>">
 
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800;900&family=Orbitron:wght@600;700;800;900&family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800;900&family=Orbitron:wght@600;700;800;900&family=Tajawal:wght@400;500;700;800;900&family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
 
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Firebase Compat SDKs (v10.12.0) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
-    <!-- Master Stylesheet -->
+    <style>
+        #stat-daily-rev, #stat-monthly-rev, #stat-active-doctors-count { font-variant-numeric: tabular-nums; }
+        .modal-bd > div { will-change: transform, opacity; }
+    </style>
+
     <link rel="stylesheet" href="styles.css">
 </head>
 
 <body class="select-none overflow-x-hidden antialiased text-white bg-[#070b19]">
 
-    <!-- Ultra-Lightweight 3D Space & Ambient Canvas -->
     <canvas id="space-canvas"></canvas>
     <div class="bg-orbs">
         <div class="orb orb-1"></div>
@@ -40,7 +39,6 @@
     <div class="bg-grid-medical"></div>
     <div class="bg-vignette"></div>
 
-    <!-- Toast Notification Dispatcher -->
     <div id="toast-wrap"></div>
 
     <!-- ==================== 1. GLOBAL LOGIN GATEWAY ==================== -->
@@ -73,7 +71,6 @@
 
     <!-- ==================== 2. MAIN APPLICATION SHELL ==================== -->
     <div id="app-shell" class="hidden">
-        <!-- Master Header Navigation -->
         <header class="app-header">
             <div class="flex items-center justify-between p-3.5 px-4 md:px-8">
                 <div class="flex items-center gap-4">
@@ -104,7 +101,6 @@
                     </div>
                 </div>
 
-                <!-- Header Actions -->
                 <div class="flex items-center gap-2.5">
                     <button class="btn btn-ghost text-xs py-2 px-3.5 text-pink-400 border-pink-500/30" onclick="window.ClinicEngine.handleGlobalLogout()">
                         <span>🚪</span>
@@ -119,7 +115,6 @@
             <div class="header-bar"></div>
         </header>
 
-        <!-- Off-Canvas Drawer (Main Navigation) -->
         <div id="drawer-overlay" class="drawer-overlay" onclick="window.ClinicEngine.closeDrawer()"></div>
         <aside id="drawer" class="drawer">
             <div class="flex items-center justify-between mb-7">
@@ -155,11 +150,9 @@
                 <button class="nav-item" data-view="admin-treatments" onclick="window.ClinicEngine.switchAdminView('admin-treatments')">
                     <span class="nav-icon">💉</span><span class="flex-1 text-right">كتالوج العلاجات المركزي</span>
                 </button>
-                <!-- NEW SECTION: قسم المنتجات المستهلكة -->
                 <button class="nav-item" data-view="admin-consumed" onclick="window.ClinicEngine.switchAdminView('admin-consumed')">
                     <span class="nav-icon">📦</span><span class="flex-1 text-right">قسم المنتجات المستهلكة</span>
                 </button>
-                <!-- NEW SECTION: قسم المرضى -->
                 <button class="nav-item" data-view="admin-patients" onclick="window.ClinicEngine.switchAdminView('admin-patients')">
                     <span class="nav-icon">🔍</span><span class="flex-1 text-right">قسم المرضى والسجلات</span>
                 </button>
@@ -181,13 +174,10 @@
             </div>
         </aside>
 
-        <!-- ==================== MAIN WORKSPACE ==================== -->
         <main class="p-4 md:p-8 max-w-7xl mx-auto pb-24">
 
-            <!-- ==================== 1. ADMIN DASHBOARD ==================== -->
             <div id="section-admin-portal" class="portal-section active">
 
-                <!-- VIEW: Financial Overview & Command Center -->
                 <section id="view-admin-dashboard" class="admin-view active">
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                         <div>
@@ -196,7 +186,6 @@
                             <p class="text-gray-400 text-sm mt-1">متابعة الإيراد اليومي، الشهري، والأطباء النشطين في الوقت الفعلي</p>
                         </div>
 
-                        <!-- Reset Action Buttons -->
                         <div class="flex flex-wrap items-center gap-2.5">
                             <button class="btn btn-success text-xs py-2.5 px-3.5" onclick="window.ClinicEngine.transferDailyRevenue()">
                                 <span>⟳</span>
@@ -213,7 +202,6 @@
                         </div>
                     </div>
 
-                    <!-- Financial & Active Doctors Cards (UPDATED: Debts replaced with Active Doctors) -->
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
                         <div class="stat-card stat-emerald">
                             <span class="stat-tag">TODAY.REVENUE</span>
@@ -231,7 +219,6 @@
                                 <span class="stat-unit text-cyan-400">تراكمي الشهر</span>
                             </div>
                         </div>
-                        <!-- Active Doctors Card (Replaced Total Debts) -->
                         <div class="stat-card stat-violet cursor-pointer" onclick="window.ClinicEngine.switchAdminView('admin-doctors')">
                             <span class="stat-tag">ACTIVE.DOCTORS</span>
                             <div class="stat-num text-cyan-300" id="stat-active-doctors-count">0</div>
@@ -242,7 +229,6 @@
                         </div>
                     </div>
 
-                    <!-- Quick Doctors Snapshot -->
                     <div class="glass p-6 mb-8">
                         <div class="flex justify-between items-center mb-5 pb-4 border-b border-white/10">
                             <div class="flex items-center gap-3">
@@ -258,7 +244,6 @@
                     </div>
                 </section>
 
-                <!-- VIEW: Doctors Management & Control Center -->
                 <section id="view-admin-doctors" class="admin-view">
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                         <div>
@@ -273,7 +258,6 @@
                     <div id="doctors-cards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
                 </section>
 
-                <!-- VIEW: Central Treatments Catalog (UPDATED: Price Editing Enabled) -->
                 <section id="view-admin-treatments" class="admin-view">
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                         <div>
@@ -303,7 +287,6 @@
                     </div>
                 </section>
 
-                <!-- NEW SECTION: قسم المنتجات المستهلكة -->
                 <section id="view-admin-consumed" class="admin-view">
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                         <div>
@@ -330,7 +313,6 @@
                     </div>
                 </section>
 
-                <!-- NEW SECTION: قسم المرضى والسجلات -->
                 <section id="view-admin-patients" class="admin-view">
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                         <div>
@@ -344,13 +326,10 @@
                     </div>
 
                     <div class="glass p-6">
-                        <div id="patients-registry-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <!-- Populated with patient cards -->
-                        </div>
+                        <div id="patients-registry-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
                     </div>
                 </section>
 
-                <!-- VIEW: Debts Ledger -->
                 <section id="view-admin-debts" class="admin-view">
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                         <div>
@@ -366,7 +345,6 @@
                     <div class="glass p-6" id="full-debts-container"></div>
                 </section>
 
-                <!-- VIEW: Activities & Security Log -->
                 <section id="view-admin-activities" class="admin-view">
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                         <div>
@@ -386,7 +364,6 @@
                     </div>
                 </section>
 
-                <!-- VIEW: Full Sessions History (UPDATED: Archive Action Added) -->
                 <section id="view-admin-sessions" class="admin-view">
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                         <div>
@@ -421,14 +398,11 @@
             <!-- ==================== 2. DOCTOR MOBILE PORTAL ==================== -->
             <div id="section-doctor-portal" class="portal-section">
 
-                <!-- Doctor Dashboard View -->
                 <div id="doctor-view-dashboard" class="max-w-xl mx-auto">
                     <div class="glass-doctor-card p-6 mb-5 relative">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-3.5">
-                                <div class="w-13 h-13 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-3xl">
-                                    🩺
-                                </div>
+                                <div class="avatar-3d" style="width:56px;height:56px;font-size:26px;"><span>🩺</span></div>
                                 <div>
                                     <h3 id="doc-active-name" class="text-xl font-black text-white font-tajawal">—</h3>
                                     <p id="doc-active-phone" class="text-xs text-cyan-400 font-mono mt-0.5">—</p>
@@ -437,7 +411,6 @@
                             <button class="btn btn-ghost py-1.5 px-3 text-xs text-red-400 border-red-500/30" onclick="window.ClinicEngine.handleGlobalLogout()">خروج</button>
                         </div>
 
-                        <!-- Stats -->
                         <div class="grid grid-cols-2 gap-3 mt-5 pt-4 border-t border-white/10 font-mono">
                             <div class="p-3 rounded-xl bg-black/40 border border-white/5">
                                 <span class="text-[10px] text-gray-400 block mb-0.5">إيرادك اليوم:</span>
@@ -452,13 +425,11 @@
                         </div>
                     </div>
 
-                    <!-- Add Patient Big Call-to-Action -->
                     <button class="btn btn-primary w-full py-4 text-base font-black shadow-xl shadow-cyan-500/30 mb-6 flex items-center justify-center gap-3" onclick="window.ClinicEngine.openAddPatientFullScreen()">
                         <span class="text-2xl leading-none">+</span>
                         <span>إضافة مراجع / جلسة علاجية جديدة</span>
                     </button>
 
-                    <!-- Assigned Patients List -->
                     <div class="glass-doctor-card p-5">
                         <h4 class="font-bold text-white text-sm mb-4 flex items-center gap-2">
                             <span class="text-cyan-400">▸</span> سجل مرضى وجلسات اليوم
@@ -467,7 +438,6 @@
                     </div>
                 </div>
 
-                <!-- Full-Screen Add Patient Flow -->
                 <div id="doctor-view-add-patient" class="full-screen-flow hidden">
                     <div class="max-w-xl mx-auto px-4 py-6">
                         <div class="flex items-center justify-between mb-6 pb-4 border-b border-cyan-500/20">
@@ -530,7 +500,6 @@
 
     <!-- ==================== SYSTEM MODALS ==================== -->
 
-    <!-- Modal: Add New Doctor Account -->
     <div id="modal-add-doctor" class="modal-bd">
         <div class="glass-doctor-card p-7 max-w-md w-full relative">
             <button onclick="window.ClinicEngine.closeModal('modal-add-doctor')" class="absolute top-4 left-4 w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center hover:bg-white/10 transition-colors">✕</button>
@@ -552,14 +521,13 @@
         </div>
     </div>
 
-    <!-- Modal: Doctor Detailed Profile & Schedule View (NEW UPDATED) -->
     <div id="modal-doctor-details" class="modal-bd">
         <div class="glass-doctor-card p-7 max-w-3xl w-full max-h-[90vh] overflow-y-auto no-scrollbar relative">
             <button onclick="window.ClinicEngine.closeModal('modal-doctor-details')" class="absolute top-4 left-4 w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center hover:bg-white/10 transition-colors">✕</button>
             
             <div class="flex items-center justify-between mb-6 pb-4 border-b border-white/10">
                 <div class="flex items-center gap-3">
-                    <div class="w-14 h-14 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-3xl">👨‍⚕️</div>
+                    <div class="avatar-3d" style="width:56px;height:56px;font-size:26px;"><span>👨‍⚕️</span></div>
                     <div>
                         <h3 id="modal-doc-title-name" class="text-2xl font-black text-white font-tajawal">—</h3>
                         <p id="modal-doc-title-user" class="text-xs text-cyan-400 font-mono mt-0.5">—</p>
@@ -572,7 +540,6 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <!-- 1. Treatments / Medicines used today -->
                 <div class="glass p-4">
                     <h5 class="text-xs font-bold text-cyan-400 mb-2.5 flex items-center gap-1.5">
                         <span>💊</span> المواد والعلاجات المستخدمة اليوم:
@@ -580,7 +547,6 @@
                     <div id="modal-doc-treatments-used" class="space-y-1.5 max-h-36 overflow-y-auto no-scrollbar text-xs"></div>
                 </div>
 
-                <!-- 2. Today's Patients List -->
                 <div class="glass p-4">
                     <h5 class="text-xs font-bold text-emerald-400 mb-2.5 flex items-center gap-1.5">
                         <span>👥</span> مرضى اليوم المسجلين:
@@ -589,7 +555,6 @@
                 </div>
             </div>
 
-            <!-- 3. Previous and Upcoming Appointments Schedule -->
             <div class="glass p-4">
                 <h5 class="text-xs font-bold text-fuchsia-400 mb-3 flex items-center gap-1.5">
                     <span>📅</span> جدول المواعيد السابقة والقادمة:
@@ -599,7 +564,6 @@
         </div>
     </div>
 
-    <!-- Modal: Add Treatment -->
     <div id="modal-add-treatment" class="modal-bd">
         <div class="glass-doctor-card p-7 max-w-md w-full relative">
             <button onclick="window.ClinicEngine.closeModal('modal-add-treatment')" class="absolute top-4 left-4 w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center hover:bg-white/10 transition-colors">✕</button>
@@ -617,7 +581,6 @@
         </div>
     </div>
 
-    <!-- Modal: Edit Treatment Price & Stock (NEW) -->
     <div id="modal-edit-treatment" class="modal-bd">
         <div class="glass-doctor-card p-7 max-w-md w-full relative">
             <button onclick="window.ClinicEngine.closeModal('modal-edit-treatment')" class="absolute top-4 left-4 w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center hover:bg-white/10 transition-colors">✕</button>
@@ -636,7 +599,6 @@
         </div>
     </div>
 
-    <!-- Modal: Product Consumed Logs Detail (NEW) -->
     <div id="modal-consumed-details" class="modal-bd">
         <div class="glass-doctor-card p-7 max-w-2xl w-full max-h-[85vh] overflow-y-auto no-scrollbar relative">
             <button onclick="window.ClinicEngine.closeModal('modal-consumed-details')" class="absolute top-4 left-4 w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center hover:bg-white/10 transition-colors">✕</button>
@@ -646,7 +608,6 @@
         </div>
     </div>
 
-    <!-- Modal: Add Debt Record -->
     <div id="modal-add-debt" class="modal-bd">
         <div class="glass-doctor-card p-7 max-w-md w-full relative">
             <button onclick="window.ClinicEngine.closeModal('modal-add-debt')" class="absolute top-4 left-4 w-8 h-8 rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center hover:bg-white/10 transition-colors">✕</button>
@@ -663,7 +624,6 @@
         </div>
     </div>
 
-    <!-- Modal: System Alert & Confirm -->
     <div id="modal-sys-alert" class="modal-bd">
         <div class="glass-doctor-card p-7 max-w-sm w-full text-center">
             <div class="text-5xl mb-3">🔔</div>
@@ -685,13 +645,11 @@
         </div>
     </div>
 
-    <!-- Script Execution Pipeline -->
     <script src="3d-space.js"></script>
     <script src="security.js"></script>
     <script src="firebase-config.js"></script>
     <script src="app.js"></script>
 
-    <!-- PWA Worker Registration -->
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {

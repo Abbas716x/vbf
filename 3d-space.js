@@ -1,5 +1,5 @@
 /* ==================================================================
-   MEDINEXUS PRO — Ultra-Lightweight Ambient 3D Medical Canvas Engine
+   MEDINEXUS PRO — Ultra-Performance Cosmic Space Canvas Engine
    ================================================================== */
 
 (function () {
@@ -12,19 +12,28 @@
     let width = 0;
     let height = 0;
 
-    // Palette & Density Matrix (Medical Ambient)
-    const SPECTRUM = ['#00F0FF', '#00FF88', '#2563EB', '#8B5CF6'];
+    // Cosmic Optical Palette
+    const SPECTRUM = ['#00F0FF', '#00FF9D', '#FF007A', '#9D00FF', '#FFB800'];
     const IS_MOBILE = window.innerWidth < 768;
-    const STAR_COUNT = IS_MOBILE ? 60 : 120;
-    const DUST_COUNT = IS_MOBILE ? 20 : 40;
-    const CONNECTION_LIMIT = IS_MOBILE ? 80 : 130;
+    const STAR_COUNT = IS_MOBILE ? 80 : 180;
+    const DUST_COUNT = IS_MOBILE ? 25 : 50;
+    const CONNECTION_LIMIT = IS_MOBILE ? 90 : 140;
 
     let stars = [];
     let dustParticles = [];
+    let shockwaves = [];
     let isTabVisible = true;
 
-    // Tilt & Parallax Physics
-    const mouse = { x: -9999, y: -9999, active: false, radius: 150 };
+    // Subtle Ambient Nebula Flash
+    const nebulaFlash = {
+        alpha: 0,
+        targetAlpha: 0,
+        color: '#00F0FF',
+        nextTrigger: Date.now() + 5000
+    };
+
+    // Parallax Tilt & Dynamics
+    const mouse = { x: -9999, y: -9999, active: false, radius: 160 };
     const tilt = { targetX: 0, targetY: 0, currentX: 0, currentY: 0 };
 
     function resize() {
@@ -34,7 +43,7 @@
         initDust();
     }
 
-    // 1. Deep 3D Spatial Grid Stars
+    // 1. Deep 3D Celestial Stars in Spatial Z-Depth
     function initStars() {
         stars = [];
         for (let i = 0; i < STAR_COUNT; i++) {
@@ -43,15 +52,15 @@
                 y: (Math.random() - 0.5) * height * 2,
                 z: Math.random() * 1000 + 40,
                 baseZ: Math.random() * 1000 + 40,
-                size: Math.random() * 1.4 + 0.6,
+                size: Math.random() * 1.5 + 0.5,
                 twinkle: Math.random() * Math.PI * 2,
                 twinkleSpeed: Math.random() * 0.02 + 0.008,
-                color: Math.random() > 0.4 ? '#ffffff' : (Math.random() > 0.5 ? '#00F0FF' : '#00FF88')
+                color: Math.random() > 0.4 ? '#ffffff' : (Math.random() > 0.5 ? '#00F0FF' : '#00FF9D')
             });
         }
     }
 
-    // 2. Foreground Floating Medical Dust Network
+    // 2. Interactive Foreground Neon Dust Network
     function initDust() {
         dustParticles = [];
         for (let i = 0; i < DUST_COUNT; i++) {
@@ -60,18 +69,42 @@
                 x: Math.random() * width,
                 y: Math.random() * height,
                 z: depth,
-                vx: (Math.random() - 0.5) * 0.3 * depth,
-                vy: (Math.random() - 0.5) * 0.3 * depth,
+                vx: (Math.random() - 0.5) * 0.35 * depth,
+                vy: (Math.random() - 0.5) * 0.35 * depth,
                 radius: (Math.random() * 2 + 1) * depth,
                 color: SPECTRUM[Math.floor(Math.random() * SPECTRUM.length)],
                 pulse: Math.random() * Math.PI * 2,
-                pulseSpeed: Math.random() * 0.025 + 0.01
+                pulseSpeed: Math.random() * 0.028 + 0.012
             });
         }
     }
 
+    // 3. Kinetic Shockwave Impulse on Interaction
+    function triggerShockwave(x, y) {
+        shockwaves.push({
+            x, y,
+            radius: 8,
+            maxRadius: IS_MOBILE ? 160 : 240,
+            alpha: 0.85,
+            speed: 7,
+            color: SPECTRUM[Math.floor(Math.random() * SPECTRUM.length)]
+        });
+
+        // Dust particle repulsive reaction
+        dustParticles.forEach(p => {
+            const dx = p.x - x;
+            const dy = p.y - y;
+            const dist = Math.hypot(dx, dy);
+            if (dist < 220 && dist > 1) {
+                const force = ((220 - dist) / 220) * 8;
+                p.vx += (dx / dist) * force;
+                p.vy += (dy / dist) * force;
+            }
+        });
+    }
+
     let lastTime = 0;
-    const FRAME_RATE_LIMIT = 1000 / 60; // Locked 60 FPS for battery saving
+    const FRAME_RATE_LIMIT = 1000 / 60; // 60 FPS Lock
 
     // 60 FPS Render Pipeline
     function render(currentTime) {
@@ -88,22 +121,40 @@
         tilt.currentX += (tilt.targetX - tilt.currentX) * 0.05;
         tilt.currentY += (tilt.targetY - tilt.currentY) * 0.05;
 
+        // A. Subtle Distant Cosmic Lightning / Nebula Pulse
+        if (Date.now() > nebulaFlash.nextTrigger) {
+            nebulaFlash.targetAlpha = 0.035;
+            nebulaFlash.color = Math.random() > 0.5 ? '#00F0FF' : '#9D00FF';
+            nebulaFlash.nextTrigger = Date.now() + Math.random() * 12000 + 8000;
+        }
+        nebulaFlash.alpha += (nebulaFlash.targetAlpha - nebulaFlash.alpha) * 0.08;
+        if (nebulaFlash.targetAlpha > 0 && nebulaFlash.alpha >= 0.032) {
+            nebulaFlash.targetAlpha = 0;
+        }
+
+        if (nebulaFlash.alpha > 0.005) {
+            ctx.fillStyle = nebulaFlash.color;
+            ctx.globalAlpha = nebulaFlash.alpha;
+            ctx.fillRect(0, 0, width, height);
+            ctx.globalAlpha = 1.0;
+        }
+
+        // B. Render Deep 3D Celestial Stars
         const cx = width / 2;
         const cy = height / 2;
 
-        // A. Render 3D Deep Stars
         for (let i = 0; i < stars.length; i++) {
             const star = stars[i];
-            star.z -= 0.55;
+            star.z -= 0.6;
             if (star.z <= 10) {
                 star.z = 1000;
                 star.x = (Math.random() - 0.5) * width * 2;
                 star.y = (Math.random() - 0.5) * height * 2;
             }
 
-            const k = 400 / star.z;
-            const px = star.x * k + cx + tilt.currentX * 1.5;
-            const py = star.y * k + cy + tilt.currentY * 1.5;
+            const k = 420 / star.z;
+            const px = star.x * k + cx + tilt.currentX * 1.6;
+            const py = star.y * k + cy + tilt.currentY * 1.6;
 
             if (px >= 0 && px <= width && py >= 0 && py <= height) {
                 star.twinkle += star.twinkleSpeed;
@@ -111,14 +162,14 @@
                 ctx.fillStyle = star.color;
                 ctx.globalAlpha = brightness;
                 ctx.beginPath();
-                ctx.arc(px, py, Math.max(0.6, star.size * k * 0.7), 0, Math.PI * 2);
+                ctx.arc(px, py, Math.max(0.65, star.size * k * 0.75), 0, Math.PI * 2);
                 ctx.fill();
             }
         }
 
         ctx.globalAlpha = 1.0;
 
-        // B. Constellation Network Linkages
+        // C. Constellation Network Interlinkage
         for (let i = 0; i < dustParticles.length; i++) {
             const p1 = dustParticles[i];
             for (let j = i + 1; j < dustParticles.length; j++) {
@@ -130,7 +181,7 @@
                 if (dist < CONNECTION_LIMIT) {
                     const alpha = (1 - dist / CONNECTION_LIMIT) * 0.22 * Math.min(p1.z, p2.z);
                     ctx.strokeStyle = `rgba(0, 240, 255, ${alpha})`;
-                    ctx.lineWidth = 0.7 * Math.min(p1.z, p2.z);
+                    ctx.lineWidth = 0.75 * Math.min(p1.z, p2.z);
                     ctx.beginPath();
                     ctx.moveTo(p1.x, p1.y);
                     ctx.lineTo(p2.x, p2.y);
@@ -139,7 +190,7 @@
             }
         }
 
-        // C. Ambient Floating Dust Nodes
+        // D. Interactive Neon Dust Nodes & Gravitational Repulsion
         for (let i = 0; i < dustParticles.length; i++) {
             const p = dustParticles[i];
             p.pulse += p.pulseSpeed;
@@ -150,18 +201,18 @@
                 const mdist = Math.hypot(mdx, mdy);
                 if (mdist < mouse.radius && mdist > 0.1) {
                     const mforce = (mouse.radius - mdist) / mouse.radius;
-                    p.vx += (mdx / mdist) * mforce * 0.5 * p.z;
-                    p.vy += (mdy / mdist) * mforce * 0.5 * p.z;
+                    p.vx += (mdx / mdist) * mforce * 0.6 * p.z;
+                    p.vy += (mdy / mdist) * mforce * 0.6 * p.z;
                 }
             }
 
-            p.x += p.vx + tilt.currentX * p.z * 0.3;
-            p.y += p.vy + tilt.currentY * p.z * 0.3;
+            p.x += p.vx + tilt.currentX * p.z * 0.35;
+            p.y += p.vy + tilt.currentY * p.z * 0.35;
             p.vx *= 0.985;
             p.vy *= 0.985;
 
-            if (Math.abs(p.vx) < 0.05) p.vx += (Math.random() - 0.5) * 0.03;
-            if (Math.abs(p.vy) < 0.05) p.vy += (Math.random() - 0.5) * 0.03;
+            if (Math.abs(p.vx) < 0.06) p.vx += (Math.random() - 0.5) * 0.03;
+            if (Math.abs(p.vy) < 0.06) p.vy += (Math.random() - 0.5) * 0.03;
 
             if (p.x < 0) { p.x = 0; p.vx *= -1; }
             if (p.x > width) { p.x = width; p.vx *= -1; }
@@ -174,15 +225,38 @@
             ctx.arc(p.x, p.y, currentRadius, 0, Math.PI * 2);
             ctx.fillStyle = p.color;
             ctx.shadowColor = p.color;
-            ctx.shadowBlur = 10 * p.z;
-            ctx.globalAlpha = 0.8;
+            ctx.shadowBlur = 12 * p.z;
+            ctx.globalAlpha = 0.85;
             ctx.fill();
             ctx.shadowBlur = 0;
             ctx.globalAlpha = 1.0;
         }
+
+        // E. Expanding Impulse Shockwaves
+        for (let i = shockwaves.length - 1; i >= 0; i--) {
+            const sw = shockwaves[i];
+            sw.radius += sw.speed;
+            sw.alpha -= 0.022;
+
+            if (sw.alpha <= 0 || sw.radius >= sw.maxRadius) {
+                shockwaves.splice(i, 1);
+                continue;
+            }
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+            ctx.strokeStyle = sw.color;
+            ctx.globalAlpha = sw.alpha;
+            ctx.lineWidth = 2.2;
+            ctx.shadowColor = sw.color;
+            ctx.shadowBlur = 18;
+            ctx.stroke();
+            ctx.restore();
+        }
     }
 
-    // Input & Visibility Listeners
+    // Input & Visibility Listeners Pipeline
     window.addEventListener('resize', resize);
 
     document.addEventListener('visibilitychange', () => {
@@ -194,8 +268,14 @@
         mouse.y = e.clientY;
         mouse.active = true;
 
-        tilt.targetX = (e.clientX / width - 0.5) * 3;
-        tilt.targetY = (e.clientY / height - 0.5) * 3;
+        tilt.targetX = (e.clientX / width - 0.5) * 4;
+        tilt.targetY = (e.clientY / height - 0.5) * 4;
+
+        const orbs = document.querySelectorAll('.orb');
+        orbs.forEach((orb, idx) => {
+            const factor = (idx % 2 === 0 ? -1 : 1) * (10 + idx * 4);
+            orb.style.transform = `translate(${tilt.targetX * factor}px, ${tilt.targetY * factor}px)`;
+        });
     });
 
     window.addEventListener('mouseleave', () => {
@@ -204,13 +284,20 @@
         tilt.targetY = 0;
     });
 
+    window.addEventListener('click', e => {
+        if (e.target.closest('.modal-bd') || e.target.closest('button') || e.target.closest('.inp') || e.target.closest('.drawer')) {
+            return;
+        }
+        triggerShockwave(e.clientX, e.clientY);
+    });
+
     window.addEventListener('touchmove', e => {
         if (e.touches[0]) {
             mouse.x = e.touches[0].clientX;
             mouse.y = e.touches[0].clientY;
             mouse.active = true;
-            tilt.targetX = (mouse.x / width - 0.5) * 3;
-            tilt.targetY = (mouse.y / height - 0.5) * 3;
+            tilt.targetX = (mouse.x / width - 0.5) * 4;
+            tilt.targetY = (mouse.y / height - 0.5) * 4;
         }
     }, { passive: true });
 
@@ -220,7 +307,7 @@
         tilt.targetY = 0;
     });
 
-    // Boot Engine
+    // Boot 3D Engine
     resize();
     requestAnimationFrame(render);
 })();

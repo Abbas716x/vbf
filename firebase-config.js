@@ -1,5 +1,5 @@
 /* ==================================================================
-   MEDINEXUS PRO — Resilient Firebase Engine & Data Operations
+   MEDINEXUS PRO — Enterprise Real-Time Cloud Engine & Data Security
    ================================================================== */
 
 (function () {
@@ -30,6 +30,12 @@
     const COLL_ACTIVITIES = 'activities'; // { id, type, title, details, user, role, timestamp }
     const COLL_CONSUMED_LOGS = 'consumed_logs'; // { id, treatmentId, treatmentName, doctorId, doctorName, qty, timestamp }
 
+    // Sanitize string against XSS / injection attacks
+    function cleanInput(str) {
+        if (!str) return '';
+        return String(str).replace(/[<>]/g, '').trim();
+    }
+
     // Status Indicator
     function updateStatusIndicator(status, text) {
         try {
@@ -42,7 +48,7 @@
         } catch (e) {}
     }
 
-    // Initialize Firebase
+    // Initialize Firebase SDK
     try {
         if (typeof firebase !== 'undefined' && firebase.initializeApp) {
             fbApp = firebase.initializeApp(firebaseConfig);
@@ -56,7 +62,7 @@
 
             isCloudReady = true;
             updateStatusIndicator('online', 'CONNECTED');
-            console.log('%c🔥 Firebase Firestore Cloud Engine Ready', 'color:#00F0FF;font-weight:bold');
+            console.log('%c🔥 Firebase Firestore Cloud Engine Ready (Secure)', 'color:#00F0FF;font-weight:bold');
         } else {
             throw new Error('Firebase SDK is not loaded.');
         }
@@ -66,7 +72,7 @@
         updateStatusIndicator('offline', 'OFFLINE');
     }
 
-    // Silent Auth Helper
+    // Anonymous Auth Verifier
     async function ensureAuth() {
         if (!isCloudReady || !fbAuth) return false;
         try {
@@ -96,7 +102,7 @@
         } catch (e) {}
     }
 
-    // ==================== 1. USERS & DOCTORS ====================
+    // ==================== 1. USERS & DOCTORS CRUD ====================
     function subscribeDoctors(callback) {
         if (!isCloudReady || !fbDb) return () => {};
 
@@ -118,7 +124,7 @@
         if (!isCloudReady || !fbDb) throw new Error('الاتصال بقاعدة البيانات غير متوفر!');
         await ensureAuth();
 
-        const cleanUser = String(username).trim().toLowerCase();
+        const cleanUser = cleanInput(username).toLowerCase();
         const duplicateCheck = await fbDb.collection(COLL_USERS).where('username', '==', cleanUser).get();
         if (!duplicateCheck.empty) {
             throw new Error('اسم المستخدم مسجل مسبقاً لطبيب آخر!');
@@ -127,10 +133,10 @@
         const uid = 'doc_' + Date.now().toString(36);
         const doctorData = {
             uid,
-            name: String(name).trim(),
-            phone: String(phone).trim(),
+            name: cleanInput(name),
+            phone: cleanInput(phone),
             username: cleanUser,
-            subPassword: String(subPassword).trim(),
+            subPassword: cleanInput(subPassword),
             role: 'doctor',
             isActive: true,
             createdAt: new Date().toISOString()
@@ -156,7 +162,7 @@
         await logActivityCloud({
             type: 'breach',
             title: `حذف حساب الطبيب: ${doctorName || doctorId}`,
-            details: `تم حذف حساب الطبيب نهائياً من النظام وسحب كافة صلاحياته.`,
+            details: `تم حذف حساب الطبيب نهائياً وسحب كافة صلاحياته.`,
             user: 'المدير العام',
             role: 'admin'
         });
@@ -183,8 +189,8 @@
         if (!isCloudReady || !fbDb) throw new Error('الاتصال بقاعدة البيانات غير متوفر!');
         await ensureAuth();
 
-        const cleanUser = String(username).trim().toLowerCase();
-        const cleanPass = String(password).trim();
+        const cleanUser = cleanInput(username).toLowerCase();
+        const cleanPass = cleanInput(password);
 
         const snap = await fbDb.collection(COLL_USERS)
             .where('role', '==', 'doctor')
@@ -229,9 +235,9 @@
         const id = 'trt_' + Date.now().toString(36);
         const item = {
             id,
-            name: String(name).trim(),
-            defaultPrice: Number(defaultPrice) || 0,
-            stock: Number(stock) || 50,
+            name: cleanInput(name),
+            defaultPrice: Math.max(0, Number(defaultPrice) || 0),
+            stock: Math.max(0, Number(stock) || 50),
             consumed: 0,
             createdAt: new Date().toISOString()
         };
@@ -244,16 +250,20 @@
         if (!isCloudReady || !fbDb) throw new Error('الاتصال بقاعدة البيانات غير متوفر!');
         await ensureAuth();
 
+        const cleanName = cleanInput(name);
+        const price = Math.max(0, Number(defaultPrice) || 0);
+        const newStock = Math.max(0, Number(stock) || 0);
+
         await fbDb.collection(COLL_TREATMENTS).doc(id).update({
-            name: String(name).trim(),
-            defaultPrice: Number(defaultPrice) || 0,
-            stock: Number(stock) || 0
+            name: cleanName,
+            defaultPrice: price,
+            stock: newStock
         });
 
         await logActivityCloud({
             type: 'financial',
-            title: `تعديل سعر ومخزون العلاج: ${name}`,
-            details: `السعر الجديد: ${defaultPrice} IQD | الكمية الكلية: ${stock}`,
+            title: `تعديل سعر ومخزون العلاج: ${cleanName}`,
+            details: `السعر الجديد: ${price} IQD | الكمية الكلية: ${newStock}`,
             user: 'المدير العام',
             role: 'admin'
         });
@@ -269,7 +279,7 @@
         return true;
     }
 
-    // ==================== 3. SESSIONS & CONSUMED LOGS ====================
+    // ==================== 3. PATIENT SESSIONS & CONSUMED LOGS ====================
     function subscribeSessions(callback) {
         if (!isCloudReady || !fbDb) return () => {};
 
@@ -293,53 +303,61 @@
         const sessionId = 'sess_' + Date.now().toString(36);
         const fullSession = {
             id: sessionId,
-            ...sessionData,
+            doctorId: cleanInput(sessionData.doctorId),
+            doctorName: cleanInput(sessionData.doctorName),
+            doctorPhone: cleanInput(sessionData.doctorPhone),
+            patientName: cleanInput(sessionData.patientName),
+            patientPhone: cleanInput(sessionData.patientPhone),
+            treatmentId: cleanInput(sessionData.treatmentId),
+            treatmentName: cleanInput(sessionData.treatmentName),
+            finalPrice: Math.max(0, Number(sessionData.finalPrice) || 0),
+            session1Date: sessionData.session1Date,
+            session2Date: sessionData.session2Date,
             createdAt: new Date().toISOString()
         };
 
         updateStatusIndicator('sync', 'SAVING');
 
-        // 1. Save Session Document
+        // 1. Save Session Document directly
         await fbDb.collection(COLL_SESSIONS).doc(sessionId).set(fullSession);
 
-        // 2. Increment Daily Revenue
-        const sessionPrice = Number(sessionData.finalPrice) || 0;
-        if (sessionPrice > 0) {
+        // 2. Increment Daily Revenue safely
+        if (fullSession.finalPrice > 0) {
             fbDb.collection(COLL_FINANCES).doc('summary').set({
-                dailyTotal: firebase.firestore.FieldValue.increment(sessionPrice)
+                dailyTotal: firebase.firestore.FieldValue.increment(fullSession.finalPrice)
             }, { merge: true }).catch(() => {});
         }
 
         // 3. Update Treatment Consumed Count in Catalog
-        if (sessionData.treatmentId) {
-            fbDb.collection(COLL_TREATMENTS).doc(sessionData.treatmentId).update({
+        if (fullSession.treatmentId) {
+            fbDb.collection(COLL_TREATMENTS).doc(fullSession.treatmentId).update({
                 consumed: firebase.firestore.FieldValue.increment(1)
             }).catch(() => {});
         }
 
-        // 4. Log to Consumed Products Audit
+        // 4. Log to Consumed Products Logs
         const logId = 'csl_' + Date.now().toString(36);
         fbDb.collection(COLL_CONSUMED_LOGS).doc(logId).set({
             id: logId,
-            treatmentId: sessionData.treatmentId || '',
-            treatmentName: sessionData.treatmentName,
-            doctorId: sessionData.doctorId,
-            doctorName: sessionData.doctorName,
-            patientName: sessionData.patientName,
+            treatmentId: fullSession.treatmentId || '',
+            treatmentName: fullSession.treatmentName,
+            doctorId: fullSession.doctorId,
+            doctorName: fullSession.doctorName,
+            patientName: fullSession.patientName,
             qty: 1,
             timestamp: new Date().toISOString()
         }).catch(() => {});
 
-        // 5. Activity Log
+        // 5. Activity Movement
         const actId = 'act_' + Date.now().toString(36);
         fbDb.collection(COLL_ACTIVITIES).doc(actId).set({
             id: actId,
             type: 'session',
-            title: `جلسة مراجع: ${sessionData.patientName}`,
-            details: `العلاج: ${sessionData.treatmentName} | السعر: ${sessionData.finalPrice} IQD`,
-            user: sessionData.doctorName,
+            title: `جلسة مراجع: ${fullSession.patientName}`,
+            details: `العلاج: ${fullSession.treatmentName} | السعر: ${fullSession.finalPrice} IQD`,
+            user: fullSession.doctorName,
             role: 'doctor',
-            doctorId: sessionData.doctorId,
+            doctorId: fullSession.doctorId,
             timestamp: new Date().toISOString()
         }).catch(() => {});
 
@@ -355,7 +373,7 @@
         await logActivityCloud({
             type: 'financial',
             title: `حذف وأرشفة جلسة مراجع`,
-            details: `تم حذف وثيقة الجلسة ID: ${sessionId} من السجل النشط للأرشيف.`,
+            details: `تم حذف وثيقة الجلسة ID: ${sessionId} من السجل النشط ونقلها للأرشيف.`,
             user: 'المدير العام',
             role: 'admin'
         });
@@ -402,7 +420,11 @@
             const id = 'act_' + Date.now().toString(36);
             const record = {
                 id,
-                ...activityData,
+                type: cleanInput(activityData.type),
+                title: cleanInput(activityData.title),
+                details: cleanInput(activityData.details),
+                user: cleanInput(activityData.user),
+                role: cleanInput(activityData.role),
                 timestamp: activityData.timestamp || new Date().toISOString()
             };
             await fbDb.collection(COLL_ACTIVITIES).doc(id).set(record);
@@ -502,9 +524,9 @@
         const id = 'debt_' + Date.now().toString(36);
         const debtRecord = {
             id,
-            patientName: String(patientName).trim(),
-            patientPhone: String(patientPhone).trim(),
-            remainingAmount: Number(remainingAmount) || 0,
+            patientName: cleanInput(patientName),
+            patientPhone: cleanInput(patientPhone),
+            remainingAmount: Math.max(0, Number(remainingAmount) || 0),
             status: 'unpaid',
             createdAt: new Date().toISOString()
         };

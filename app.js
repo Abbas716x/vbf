@@ -1,5 +1,5 @@
 /* ==================================================================
-   MEDINEXUS PRO — Master Clinic Control Engine & Operations v2.0
+   MEDINEXUS PRO — Master Liquid Glass & Cybernetic App Engine
    ================================================================== */
 
 (function () {
@@ -16,74 +16,53 @@
         const d = new Date(iso);
         return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
     }
+    
+    // Strict Anti-XSS Sanitizer
     function escapeHtml(s) {
         return String(s || '').replace(/[&<>"']/g, m => ({
             '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
         })[m]);
     }
 
-    /* ==================== COUNTUP ANIMATION ENGINE ==================== */
-    class CountUp {
-        constructor(el, opts = {}) {
-            this.el = typeof el === 'string' ? document.querySelector(el) : el;
-            this.current = 0;
-            this.target = 0;
-            this.raf = null;
-            this.duration = opts.duration || 1200;
-            this.formatter = opts.formatter || (n => new Intl.NumberFormat('en-US').format(Math.round(n)));
-        }
-        set(value) {
-            const target = Number(value) || 0;
-            if (target === this.target && this.raf === null) return;
-            const start = this.current;
-            const startTime = performance.now();
-            const self = this;
-            if (this.raf) cancelAnimationFrame(this.raf);
-
-            const tick = (now) => {
-                const progress = Math.min(1, (now - startTime) / self.duration);
-                const eased = 1 - Math.pow(1 - progress, 5);
-                self.current = start + (target - start) * eased;
-                if (self.el) self.el.textContent = self.formatter(self.current);
-                if (progress < 1) {
-                    self.raf = requestAnimationFrame(tick);
-                } else {
-                    self.current = target;
-                    if (self.el) self.el.textContent = self.formatter(target);
-                    self.raf = null;
-                }
-            };
-            this.target = target;
-            this.raf = requestAnimationFrame(tick);
-        }
-    }
-
-    const _counters = new Map();
-    function countUp(selector, value) {
-        if (!_counters.has(selector)) {
-            _counters.set(selector, new CountUp(selector));
-        }
-        _counters.get(selector).set(value);
-    }
-
-    /* Skeleton helpers */
-    function showTableSkeleton(tbodyId, rows = 4) {
-        const el = document.getElementById(tbodyId);
+    // Smooth Spring CountUp Animation Engine
+    const activeAnimators = {};
+    function animateCountUp(elementId, targetValue, duration = 1200) {
+        const el = document.getElementById(elementId);
         if (!el) return;
-        el.innerHTML = Array.from({ length: rows }).map(() => `<tr><td colspan="8"><div class="skeleton-row"></div></td></tr>`).join('');
-    }
-    function showGridSkeleton(gridId, count = 3) {
-        const el = document.getElementById(gridId);
-        if (!el) return;
-        el.innerHTML = Array.from({ length: count }).map(() => `<div class="skeleton" style="height:180px"></div>`).join('');
+
+        const startValue = Number(el.getAttribute('data-current-val') || 0);
+        targetValue = Math.round(Number(targetValue) || 0);
+        el.setAttribute('data-current-val', targetValue);
+
+        if (activeAnimators[elementId]) {
+            cancelAnimationFrame(activeAnimators[elementId]);
+        }
+
+        const startTime = performance.now();
+        function update(currentTime) {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            // EaseOutExpo curve
+            const ease = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+            const current = Math.round(startValue + (targetValue - startValue) * ease);
+            el.textContent = fmt(current);
+
+            if (progress < 1) {
+                activeAnimators[elementId] = requestAnimationFrame(update);
+            } else {
+                el.textContent = fmt(targetValue);
+                delete activeAnimators[elementId];
+            }
+        }
+        activeAnimators[elementId] = requestAnimationFrame(update);
     }
 
     // Master System State
     const State = {
-        currentUser: null,
-        portalMode: 'admin',
+        currentUser: null,    // { role: 'admin'|'doctor', name, username, phone, uid }
+        portalMode: 'admin',  // 'admin' | 'doctor'
         activeAdminView: 'admin-dashboard',
-        activityFilter: 'all',
+        activityFilter: 'all', // 'all' | 'breach' | 'session'
         finances: { dailyTotal: 0, monthlyTotal: 0 },
         doctors: [],
         treatments: [],
@@ -117,7 +96,7 @@
     let confirmResolver = null;
 
     const DialogEngine = {
-        alert: function (message, title = 'تنبيه النظام') {
+        alert: function (message, title = 'تنبيه المنظومة') {
             return new Promise(resolve => {
                 alertResolver = resolve;
                 $('#sys-alert-title').textContent = title;
@@ -152,7 +131,7 @@
     };
     window.DialogEngine = DialogEngine;
 
-    // Viewport & Modal Helpers
+    // Viewport & Drawer Helpers
     function openModal(id) {
         const el = document.getElementById(id);
         if (el) el.style.display = 'flex';
@@ -170,13 +149,14 @@
         $('#drawer-overlay')?.classList.remove('show');
     }
 
+    // Security Context
     function getCurrentUserContext() {
         if (State.currentUser) return State.currentUser;
         return { name: 'زائر / شاشة الدخول', role: 'guest', username: 'guest' };
     }
 
     function showSecurityWarning(type) {
-        toast(`⚠️ تنبيه أمني: تم رصد ومنع [${type}] وتسجيل المحاولة في سجل الحركات!`, 'error', 4500);
+        toast(`⚠️ بروتوكول حماية: تم اعتراض ومنع [${type}] ورصد المحاولة في سجل الحركات!`, 'error', 4500);
     }
 
     // ==================== 1. GLOBAL LOGIN GATEWAY ====================
@@ -191,9 +171,10 @@
         }
 
         submitBtn.disabled = true;
-        submitBtn.textContent = 'جارِ التحقق من السحابة...';
+        submitBtn.textContent = 'جارِ التحقق من السحابة والمصادقة...';
 
         try {
+            // A. Master Admin Check
             if (username === 'abbbas111' && password === 'QWERT') {
                 State.currentUser = { role: 'admin', name: 'المدير العام', username: 'abbbas111' };
                 localStorage.setItem('medinexus_session', JSON.stringify(State.currentUser));
@@ -202,6 +183,7 @@
                 return;
             }
 
+            // B. Doctor Check in Firestore
             const doctorData = await window.MedicalFirebase.verifyDoctorCredentials(username, password);
             State.currentUser = {
                 role: 'doctor',
@@ -220,7 +202,7 @@
             toast(err.message || 'بيانات الدخول غير صحيحة!', 'error', 4000);
         } finally {
             submitBtn.disabled = false;
-            submitBtn.textContent = 'دخول إلى النظام';
+            submitBtn.textContent = 'دخول للمنظومة المركزية';
         }
     }
 
@@ -233,7 +215,7 @@
             $('#section-admin-portal').classList.add('active');
             $('#section-doctor-portal').classList.remove('active');
             $('#header-role-badge').textContent = 'لوحة الإدارة';
-            $('#header-role-badge').className = 'badge badge-cyan text-[10px] py-0.5 px-2';
+            $('#header-role-badge').className = 'badge badge-cyan text-[10px] py-0.5 px-2.5';
             $('#btn-header-label').textContent = 'إضافة طبيب';
             $('#btn-hamburger').style.display = 'flex';
             $('#session-user-display').textContent = 'المستخدم: المدير العام';
@@ -243,7 +225,7 @@
             $('#section-admin-portal').classList.remove('active');
             $('#section-doctor-portal').classList.add('active');
             $('#header-role-badge').textContent = 'بوابة الطبيب';
-            $('#header-role-badge').className = 'badge badge-emerald text-[10px] py-0.5 px-2';
+            $('#header-role-badge').className = 'badge badge-emerald text-[10px] py-0.5 px-2.5';
             $('#btn-header-label').textContent = 'إضافة مراجع';
             $('#btn-hamburger').style.display = 'none';
             $('#session-user-display').textContent = `د. ${State.currentUser.name}`;
@@ -255,7 +237,7 @@
     }
 
     function handleGlobalLogout() {
-        if (!confirm('هل ترغب بتسجيل الخروج من النظام؟')) return;
+        if (!confirm('هل ترغب بتسجيل الخروج من المنظومة؟')) return;
         State.currentUser = null;
         localStorage.removeItem('medinexus_session');
         $('#login-username').value = '';
@@ -288,17 +270,19 @@
         window.scrollTo({ top: 0, behavior: 'instant' });
     }
 
-    // ==================== 2. MAIN FINANCIAL DASHBOARD ====================
+    // ==================== 2. MAIN FINANCIAL DASHBOARD & COUNTUP ====================
     function renderFinances() {
         const daily = Number(State.finances.dailyTotal) || 0;
         const monthly = Number(State.finances.monthlyTotal) || 0;
         const activeDocsCount = State.doctors.filter(d => d.isActive !== false).length;
 
-        countUp('#stat-daily-rev', daily);
-        countUp('#stat-monthly-rev', monthly);
-        countUp('#stat-active-doctors-count', activeDocsCount);
+        // Animated CountUp Numbers
+        animateCountUp('stat-daily-rev', daily);
+        animateCountUp('stat-monthly-rev', monthly);
+        animateCountUp('stat-active-doctors-count', activeDocsCount);
     }
 
+    // Reset 1: تصفير إيراد اليوم وتحويله للتراكمي
     async function transferDailyRevenue() {
         const daily = Number(State.finances.dailyTotal) || 0;
         if (daily <= 0) {
@@ -320,6 +304,7 @@
         }
     }
 
+    // Reset 2: تصفير الدين بالكامل
     async function resetDebtsOnly() {
         const totalDebts = State.debts.reduce((sum, d) => sum + (Number(d.remainingAmount) || 0), 0);
         if (totalDebts <= 0 && State.debts.length === 0) {
@@ -341,9 +326,10 @@
         }
     }
 
+    // Reset 3: تصفير كامل للنظام
     async function fullSystemReset() {
         const ok = await DialogEngine.confirm(
-            '⚠️ تحذير شديد الخطورة:\nسيؤدي هذا الإجراء إلى تصفير إيراد اليوم، الإيراد التراكمي، وسجل الديون إلى صفر (0).\n\nهل تؤكد تصفير كامل النظام؟',
+            '⚠️ تحذير أمني شديد الخطورة:\nسيؤدي هذا الإجراء إلى تصفير إيراد اليوم، الإيراد التراكمي، وسجل الديون إلى صفر (0).\n\nهل تؤكد تصفير كامل النظام؟',
             'تصفير كامل للنظام'
         );
         if (!ok) return;
@@ -356,7 +342,7 @@
         }
     }
 
-    // ==================== 3. DOCTORS MANAGEMENT ====================
+    // ==================== 3. DOCTORS MANAGEMENT & PROFILES ====================
     function renderDoctors() {
         const grid = $('#doctors-cards-grid');
         const quickGrid = $('#quick-doctors-grid');
@@ -365,14 +351,14 @@
 
         if (State.doctors.length === 0) {
             grid.innerHTML = `
-                <div class="glass p-10 text-center col-span-full">
-                    <div class="text-5xl mb-3 opacity-40">👨‍⚕️</div>
-                    <h3 class="text-xl font-bold text-white mb-2">لا يوجد أطباء مسجلين حتى الآن</h3>
-                    <p class="text-gray-400 text-xs mb-4">أضف الطبيب الأول لمنحه صلاحية تسجيل الجلسات</p>
+                <div class="liquid-card p-10 text-center col-span-full">
+                    <div class="text-6xl mb-3 opacity-40">👨‍⚕️</div>
+                    <h3 class="text-xl font-bold text-white mb-2 font-cairo">لا يوجد أطباء مسجلين حتى الآن</h3>
+                    <p class="text-gray-400 text-xs mb-4 font-tajawal">أضف الطبيب الأول لمنحه صلاحية تسجيل الجلسات</p>
                     <button class="btn btn-primary" onclick="window.ClinicEngine.openAddDoctorModal()">+ إضافة طبيب الآن</button>
                 </div>
             `;
-            if (quickGrid) quickGrid.innerHTML = `<div class="text-xs text-gray-500 col-span-full text-center py-4">لا يوجد أطباء</div>`;
+            if (quickGrid) quickGrid.innerHTML = `<div class="text-xs text-gray-500 col-span-full text-center py-4">لا يوجد أطباء نشطين</div>`;
             return;
         }
 
@@ -383,11 +369,16 @@
 
             return `
                 <div class="doctor-item-card ${!isActive ? 'frozen' : ''}" id="doc-card-${doc.uid}">
+                    <div class="card-refraction-line"></div>
                     <div class="flex items-start justify-between mb-4">
                         <div class="flex items-center gap-3.5 cursor-pointer" onclick="window.ClinicEngine.openDoctorDetailsModal('${doc.uid}')">
-                            <div class="avatar-3d"><span>👨‍⚕️</span></div>
+                            <div class="avatar-ring-outer">
+                                <div class="avatar-ring-inner flex items-center justify-center text-2xl">
+                                    👨‍⚕️
+                                </div>
+                            </div>
                             <div>
-                                <h4 class="font-bold text-white text-base font-tajawal hover:text-cyan-400 transition-colors">${escapeHtml(doc.name)}</h4>
+                                <h4 class="font-bold text-white text-base font-cairo hover:text-cyan-400 transition-colors">${escapeHtml(doc.name)}</h4>
                                 <div class="flex items-center gap-2 mt-1">
                                     <span class="text-xs text-cyan-400 font-mono">@${escapeHtml(doc.username)}</span>
                                     <span class="badge ${isActive ? 'badge-emerald' : 'badge-pink'} text-[9px]">
@@ -397,6 +388,7 @@
                             </div>
                         </div>
 
+                        <!-- Actions: Freeze switch & Delete Trash Button -->
                         <div class="flex items-center gap-2">
                             <div class="switch-container" title="${isActive ? 'إيقاف / تجميد الجلسة' : 'استئناف وتفعيل الجلسة'}" onclick="window.ClinicEngine.toggleDoctorFreeze('${doc.uid}', ${isActive})">
                                 <div class="switch-track ${isActive ? 'active' : ''}">
@@ -409,7 +401,7 @@
                         </div>
                     </div>
 
-                    <div class="p-3.5 rounded-xl bg-black/40 border border-white/5 mb-4 grid grid-cols-2 gap-2 font-mono text-xs cursor-pointer" onclick="window.ClinicEngine.openDoctorDetailsModal('${doc.uid}')">
+                    <div class="p-3.5 rounded-2xl bg-black/40 border border-white/5 mb-4 grid grid-cols-2 gap-2 font-mono text-xs cursor-pointer" onclick="window.ClinicEngine.openDoctorDetailsModal('${doc.uid}')">
                         <div>
                             <span class="text-gray-400 text-[10px] block">إيراد الطبيب اليوم:</span>
                             <span class="font-bold text-emerald-400 text-sm">${fmt(todayRev)} IQD</span>
@@ -436,10 +428,13 @@
                 const todayRev = docSessionsToday.reduce((sum, s) => sum + (Number(s.finalPrice) || 0), 0);
                 const isActive = doc.isActive !== false;
                 return `
-                    <div class="glass p-3.5 flex items-center justify-between text-xs cursor-pointer hover:border-cyan-400/50 transition-all" onclick="window.ClinicEngine.openDoctorDetailsModal('${doc.uid}')">
-                        <div>
-                            <span class="font-bold text-white block">${escapeHtml(doc.name)}</span>
-                            <span class="text-[10px] text-gray-400">${docSessionsToday.length} مراجع اليوم</span>
+                    <div class="liquid-card p-3.5 flex items-center justify-between text-xs cursor-pointer hover:border-cyan-400/50 transition-all" onclick="window.ClinicEngine.openDoctorDetailsModal('${doc.uid}')">
+                        <div class="flex items-center gap-2.5">
+                            <span class="pulse-dot-emerald"></span>
+                            <div>
+                                <span class="font-bold text-white block font-cairo">${escapeHtml(doc.name)}</span>
+                                <span class="text-[10px] text-gray-400">${docSessionsToday.length} مراجع اليوم</span>
+                            </div>
                         </div>
                         <div class="text-left font-mono">
                             <span class="text-emerald-400 font-bold block">${fmt(todayRev)} IQD</span>
@@ -491,6 +486,7 @@
         }
     }
 
+    // Modal: Detailed Doctor Profile
     function openDoctorDetailsModal(doctorId) {
         const doc = State.doctors.find(d => d.uid === doctorId || d.id === doctorId);
         if (!doc) return;
@@ -503,6 +499,7 @@
         $('#modal-doc-title-user').textContent = `اسم المستخدم: @${doc.username} • الهاتف: ${doc.phone}`;
         $('#modal-doc-today-rev').textContent = `${fmt(todayRev)} IQD`;
 
+        // 1. List of Treatments/Medicines used by this doctor today
         const treatmentsUsedEl = $('#modal-doc-treatments-used');
         if (todaySessions.length === 0) {
             treatmentsUsedEl.innerHTML = `<span class="text-gray-500">لا توجد مواد مستخدمة اليوم</span>`;
@@ -513,21 +510,22 @@
                 trtCountMap[name] = (trtCountMap[name] || 0) + 1;
             });
             treatmentsUsedEl.innerHTML = Object.entries(trtCountMap).map(([name, count]) => `
-                <div class="flex items-center justify-between p-2 rounded-lg bg-black/30 border border-white/5">
-                    <span class="text-gray-200 font-bold">${escapeHtml(name)}</span>
+                <div class="flex items-center justify-between p-2 rounded-xl bg-black/30 border border-white/5">
+                    <span class="text-gray-200 font-bold font-cairo">${escapeHtml(name)}</span>
                     <span class="badge badge-cyan text-[10px]">${count} مرات</span>
                 </div>
             `).join('');
         }
 
+        // 2. List of Today's Patients
         const patientsTodayEl = $('#modal-doc-patients-today');
         if (todaySessions.length === 0) {
             patientsTodayEl.innerHTML = `<span class="text-gray-500">لا يوجد مرضى مسجلين اليوم</span>`;
         } else {
             patientsTodayEl.innerHTML = todaySessions.map(s => `
-                <div class="flex items-center justify-between p-2 rounded-lg bg-black/30 border border-white/5">
+                <div class="flex items-center justify-between p-2 rounded-xl bg-black/30 border border-white/5">
                     <div>
-                        <span class="font-bold text-white block">${escapeHtml(s.patientName)}</span>
+                        <span class="font-bold text-white block font-cairo">${escapeHtml(s.patientName)}</span>
                         <span class="text-[10px] text-gray-400 font-mono">${escapeHtml(s.patientPhone)}</span>
                     </div>
                     <span class="text-emerald-400 font-mono font-bold">${fmt(s.finalPrice)} IQD</span>
@@ -535,15 +533,16 @@
             `).join('');
         }
 
+        // 3. Previous and Upcoming Appointment Schedules
         const apptsEl = $('#modal-doc-appointments-list');
         if (allDocSessions.length === 0) {
-            apptsEl.innerHTML = `<div class="p-4 text-center text-gray-500">لا توجد مواعيد مسجلة</div>`;
+            apptsEl.innerHTML = `<div class="p-4 text-center text-gray-500 font-cairo">لا توجد مواعيد مسجلة</div>`;
         } else {
             apptsEl.innerHTML = allDocSessions.map(s => `
-                <div class="p-2.5 rounded-lg bg-black/30 border border-white/5 flex items-center justify-between">
+                <div class="p-2.5 rounded-xl bg-black/30 border border-white/5 flex items-center justify-between">
                     <div>
-                        <span class="font-bold text-white">${escapeHtml(s.patientName)}</span>
-                        <span class="text-[10px] text-cyan-400 block">العلاج: ${escapeHtml(s.treatmentName)}</span>
+                        <span class="font-bold text-white font-cairo">${escapeHtml(s.patientName)}</span>
+                        <span class="text-[10px] text-cyan-400 block font-cairo">العلاج: ${escapeHtml(s.treatmentName)}</span>
                     </div>
                     <div class="text-left font-mono text-[10px]">
                         <span class="text-gray-400 block">الجلسة 1: ${formatDate(s.createdAt)}</span>
@@ -585,27 +584,32 @@
         }
     }
 
-    // ==================== 4. CENTRAL TREATMENTS CATALOG ====================
+    // ==================== 4. CENTRAL TREATMENTS CATALOG & PRICE EDITING ====================
     function renderTreatments() {
         const tbody = $('#treatments-table-body');
         const select = $('#pt-treatment-select');
 
+        // 1. Render Admin Catalog Table
         if (tbody) {
             if (State.treatments.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500">لا توجد علاجات في الكتالوج المركزي</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500 font-cairo">لا توجد علاجات في الكتالوج المركزي</td></tr>`;
             } else {
                 tbody.innerHTML = State.treatments.map(t => {
                     const stock = Number(t.stock) || 50;
                     return `
                         <tr class="hover:bg-cyan-500/5 transition-colors">
-                            <td class="p-4 font-bold text-white text-sm">${escapeHtml(t.name)}</td>
+                            <td class="p-4 font-bold text-white text-sm font-cairo">${escapeHtml(t.name)}</td>
                             <td class="p-4 font-mono font-bold text-emerald-400">${fmt(t.defaultPrice)} IQD</td>
                             <td class="p-4 font-mono text-amber-400 font-bold">${stock} وحدة</td>
                             <td class="p-4 text-gray-400 font-mono text-[11px]">${formatDate(t.createdAt)}</td>
                             <td class="p-4 text-center">
-                                <div class="flex items-center justify-center gap-2">
-                                    <button class="action-capsule" title="تعديل السعر والمخزون" onclick="window.ClinicEngine.openEditTreatmentModal('${t.id}')">✎</button>
-                                    <button class="action-capsule danger" title="حذف" onclick="window.ClinicEngine.deleteTreatment('${t.id}')">🗑</button>
+                                <div class="flex items-center justify-center gap-1.5">
+                                    <button class="btn btn-ghost py-1 px-2.5 text-xs text-cyan-400" title="تعديل السعر والمخزون" onclick="window.ClinicEngine.openEditTreatmentModal('${t.id}')">
+                                        ✎ تعديل
+                                    </button>
+                                    <button class="btn btn-ghost py-1 px-2 text-xs text-pink-500 border-pink-500/30" title="حذف" onclick="window.ClinicEngine.deleteTreatment('${t.id}')">
+                                        🗑
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -614,6 +618,7 @@
             }
         }
 
+        // 2. Real-Time Sync to Doctor Mobile Dropdown
         if (select) {
             const currentSelected = select.value;
             select.innerHTML = '<option value="">-- اختر نوع العلاج من الكتالوج المركزي --</option>' +
@@ -624,6 +629,7 @@
                 `).join('');
         }
 
+        // Also refresh consumed products section
         renderConsumedProducts();
     }
 
@@ -707,7 +713,7 @@
         if (!tbody) return;
 
         if (State.treatments.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500">لا توجد مواد مضافة في المخزون</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500 font-cairo">لا توجد مواد مضافة في المخزون</td></tr>`;
             return;
         }
 
@@ -719,7 +725,7 @@
 
             return `
                 <tr class="hover:bg-amber-500/5 transition-colors">
-                    <td class="p-4 font-bold text-white text-sm">${escapeHtml(t.name)}</td>
+                    <td class="p-4 font-bold text-white text-sm font-cairo">${escapeHtml(t.name)}</td>
                     <td class="p-4 font-mono font-bold text-white">${totalStock} وحدة</td>
                     <td class="p-4 font-mono font-bold text-amber-400">
                         ${consumed} وحدة (${percent}%)
@@ -731,7 +737,9 @@
                         ${remaining} وحدة
                     </td>
                     <td class="p-4 text-center">
-                        <button class="action-capsule" title="تفاصيل الاستهلاك" onclick="window.ClinicEngine.openConsumedDetails('${t.id}', '${escapeHtml(t.name)}')">🔍</button>
+                        <button class="btn btn-ghost py-1 px-3 text-xs text-amber-400 border-amber-500/30" onclick="window.ClinicEngine.openConsumedDetails('${t.id}', '${escapeHtml(t.name)}')">
+                            🔍 تفاصيل الاستهلاك
+                        </button>
                     </td>
                 </tr>
             `;
@@ -744,13 +752,13 @@
 
         const logs = State.consumedLogs.filter(l => l.treatmentId === treatmentId || l.treatmentName === treatmentName);
         if (logs.length === 0) {
-            container.innerHTML = `<div class="p-6 text-center text-gray-500">لم يتم استهلاك هذه المادة بعد أو لا توجد سجلات.</div>`;
+            container.innerHTML = `<div class="p-6 text-center text-gray-500 font-cairo">لم يتم استهلاك هذه المادة بعد أو لا توجد سجلات.</div>`;
         } else {
             container.innerHTML = logs.map(l => `
                 <div class="p-3 rounded-xl bg-black/40 border border-white/5 flex items-center justify-between text-xs">
                     <div>
-                        <span class="font-bold text-white block">د. ${escapeHtml(l.doctorName || 'طبيب')}</span>
-                        <span class="text-gray-400 text-[11px]">المراجع: ${escapeHtml(l.patientName || 'مراجع')}</span>
+                        <span class="font-bold text-white block font-cairo">د. ${escapeHtml(l.doctorName || 'طبيب')}</span>
+                        <span class="text-gray-400 text-[11px] font-tajawal">المراجع: ${escapeHtml(l.patientName || 'مراجع')}</span>
                     </div>
                     <div class="text-left font-mono">
                         <span class="badge badge-amber text-[10px]">استهلاك: ${l.qty || 1} وحدة</span>
@@ -768,6 +776,7 @@
         const container = $('#patients-registry-grid');
         if (!container) return;
 
+        // Group sessions by patient Phone or Name
         const patientsMap = {};
         State.sessions.forEach(s => {
             const key = (s.patientPhone || s.patientName || '').trim();
@@ -803,21 +812,24 @@
         }
 
         if (list.length === 0) {
-            container.innerHTML = `<div class="p-8 text-center text-gray-500 col-span-full">لا يوجد مرضى مطابقين لنتائج البحث</div>`;
+            container.innerHTML = `<div class="p-8 text-center text-gray-500 col-span-full font-cairo">لا يوجد مرضى مطابقين لنتائج البحث</div>`;
             return;
         }
 
         container.innerHTML = list.map(p => `
             <div class="patient-card">
-                <div class="flex items-start justify-between mb-3">
+                <div class="card-refraction-line"></div>
+                <div class="flex items-start justify-between mb-3.5">
                     <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-xl">👤</div>
+                        <div class="w-11 h-11 rounded-2xl bg-cyan-500/20 border border-cyan-400/30 flex items-center justify-center text-xl">👤</div>
                         <div>
-                            <h4 class="font-bold text-white text-sm font-tajawal">${escapeHtml(p.name)}</h4>
+                            <h4 class="font-bold text-white text-sm font-cairo">${escapeHtml(p.name)}</h4>
                             <span class="text-xs text-cyan-400 font-mono">${escapeHtml(p.phone)}</span>
                         </div>
                     </div>
-                    <button class="action-capsule success" title="مراسلة واتساب" onclick="window.ClinicEngine.quickWhatsAppPatient('${escapeHtml(p.phone)}', '${escapeHtml(p.name)}')">💬</button>
+                    <button class="btn btn-ghost py-1 px-3 text-xs text-emerald-400 border-emerald-500/30 hover:border-emerald-400" title="مراسلة واتساب" onclick="window.ClinicEngine.quickWhatsAppPatient('${escapeHtml(p.phone)}', '${escapeHtml(p.name)}')">
+                        💬 واتساب
+                    </button>
                 </div>
 
                 <div class="space-y-1.5 text-xs text-gray-300 font-tajawal mb-3 pt-2 border-t border-white/5">
@@ -827,7 +839,7 @@
                     </div>
                     <div class="flex justify-between">
                         <span class="text-gray-400">الطبيب المعالج:</span>
-                        <span class="text-cyan-300">د. ${escapeHtml(p.doctor)}</span>
+                        <span class="text-cyan-300 font-bold">د. ${escapeHtml(p.doctor)}</span>
                     </div>
                     <div class="flex justify-between font-mono">
                         <span class="text-gray-400">تاريخ آخر جلسة:</span>
@@ -867,25 +879,28 @@
         if (!tbody) return;
 
         if (State.sessions.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-gray-500">لا توجد جلسات مسجلة بعد</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-gray-500 font-cairo">لا توجد جلسات مسجلة بعد</td></tr>`;
             return;
         }
 
         tbody.innerHTML = State.sessions.map(s => `
             <tr class="hover:bg-cyan-500/5 transition-colors">
-                <td class="p-3.5 font-bold text-white text-sm">${escapeHtml(s.patientName)}</td>
+                <td class="p-3.5 font-bold text-white text-sm font-cairo">${escapeHtml(s.patientName)}</td>
                 <td class="p-3.5 font-mono text-cyan-300 text-xs">${escapeHtml(s.patientPhone || '—')}</td>
-                <td class="p-3.5 text-white font-tajawal font-bold">${escapeHtml(s.doctorName)}</td>
+                <td class="p-3.5 text-white font-cairo font-bold">${escapeHtml(s.doctorName)}</td>
                 <td class="p-3.5 text-gray-300">${escapeHtml(s.treatmentName)}</td>
                 <td class="p-3.5 font-mono font-black text-emerald-400">${fmt(s.finalPrice)} IQD</td>
                 <td class="p-3.5 text-gray-400 font-mono text-[11px]">${formatDate(s.session1Date || s.createdAt)}</td>
                 <td class="p-3.5 text-cyan-400 font-mono text-[11px]">${formatDate(s.session2Date)}</td>
                 <td class="p-3.5 text-center">
-                    <button class="action-capsule danger" title="حذف الجلسة للأرشيف" onclick="window.ClinicEngine.deleteSession('${s.id}')">🗑</button>
+                    <button class="btn btn-ghost py-1 px-2.5 text-xs text-pink-500 border-pink-500/30 hover:border-pink-500" title="حذف الجلسة للأرشيف" onclick="window.ClinicEngine.deleteSession('${s.id}')">
+                        🗑 حذف للأرشيف
+                    </button>
                 </td>
             </tr>
         `).join('');
 
+        // Also refresh patients registry
         renderPatientsRegistry();
     }
 
@@ -927,14 +942,14 @@
         if (!fullContainer) return;
 
         if (State.debts.length === 0) {
-            fullContainer.innerHTML = `<div class="p-8 text-center text-gray-500">سجل الديون خالي تماماً ✓</div>`;
+            fullContainer.innerHTML = `<div class="p-8 text-center text-gray-500 font-cairo">سجل الديون خالي تماماً ✓</div>`;
             return;
         }
 
         fullContainer.innerHTML = `
             <div class="overflow-x-auto no-scrollbar">
                 <table class="w-full text-right text-xs">
-                    <thead class="bg-black/40 border-b border-cyan-500/20 text-cyan-400 font-mono">
+                    <thead class="bg-black/50 border-b border-cyan-500/20 text-cyan-400 font-mono tracking-wider">
                         <tr>
                             <th class="p-3.5">اسم المريض</th>
                             <th class="p-3.5">الهاتف</th>
@@ -950,7 +965,7 @@
                             const isPaid = rem <= 0;
                             return `
                                 <tr class="hover:bg-cyan-500/5 transition-colors">
-                                    <td class="p-3.5 font-bold text-white text-sm">${escapeHtml(d.patientName)}</td>
+                                    <td class="p-3.5 font-bold text-white text-sm font-cairo">${escapeHtml(d.patientName)}</td>
                                     <td class="p-3.5 font-mono text-cyan-300 text-xs">${escapeHtml(d.patientPhone || '—')}</td>
                                     <td class="p-3.5 font-mono font-black ${isPaid ? 'text-emerald-400' : 'text-pink-500'} text-sm">${fmt(rem)} IQD</td>
                                     <td class="p-3.5 text-gray-400 font-mono text-[11px]">${formatDate(d.createdAt)}</td>
@@ -963,7 +978,7 @@
                                                 💵 تسديد
                                             </button>
                                         ` : `
-                                            <span class="text-emerald-400 text-xs font-bold">منتهي</span>
+                                            <span class="text-emerald-400 text-xs font-bold font-cairo">منتهي</span>
                                         `}
                                     </td>
                                 </tr>
@@ -1033,7 +1048,7 @@
         }
 
         if (list.length === 0) {
-            container.innerHTML = `<div class="p-8 text-center text-gray-500 text-xs font-tajawal">لا توجد حركات مسجلة حالياً ✓</div>`;
+            container.innerHTML = `<div class="p-8 text-center text-gray-500 text-xs font-cairo">لا توجد حركات مسجلة حالياً ✓</div>`;
             return;
         }
 
@@ -1041,19 +1056,18 @@
             const isBreach = act.type === 'breach';
             const isSession = act.type === 'session';
             const badgeClass = isBreach ? 'badge-rose' : (isSession ? 'badge-cyan' : 'badge-emerald');
-            const itemClass = isBreach ? 'activity-breach' : (isSession ? 'activity-session' : 'activity-financial');
             const icon = isBreach ? '🚨' : (isSession ? '🩺' : '💵');
 
             return `
-                <div class="activity-item ${itemClass}">
-                    <div class="flex items-start gap-3">
+                <div class="liquid-card p-4 flex items-start justify-between gap-3 ${isBreach ? 'border-rose-500/40' : ''}">
+                    <div class="flex items-start gap-3.5">
                         <div class="text-2xl mt-0.5">${icon}</div>
                         <div>
                             <div class="flex items-center gap-2">
-                                <h5 class="font-bold text-white text-xs">${escapeHtml(act.title)}</h5>
+                                <h5 class="font-bold text-white text-xs font-cairo">${escapeHtml(act.title)}</h5>
                                 <span class="badge ${badgeClass} text-[9px]">${escapeHtml(act.type.toUpperCase())}</span>
                             </div>
-                            <p class="text-[11px] text-gray-300 mt-1 leading-relaxed">${escapeHtml(act.details || '')}</p>
+                            <p class="text-[11px] text-gray-300 mt-1 leading-relaxed font-tajawal">${escapeHtml(act.details || '')}</p>
                             <span class="text-[10px] text-cyan-400 font-mono mt-1 block">
                                 الفاعل: ${escapeHtml(act.user || 'نظام')} (${escapeHtml(act.role || '-')})
                             </span>
@@ -1072,30 +1086,30 @@
         renderActivities();
     }
 
-    // ==================== 10. DOCTOR PORTAL ====================
+    // ==================== 10. DOCTOR PORTAL & AUTOMATED WHATSAPP ====================
     function renderDoctorDashboard() {
         if (!State.currentUser || State.currentUser.role !== 'doctor') return;
 
         const mySessionsToday = getDoctorTodaySessions(State.currentUser.uid);
         const myRevToday = mySessionsToday.reduce((sum, s) => sum + (Number(s.finalPrice) || 0), 0);
 
-        countUp('#doc-stat-today-revenue', myRevToday);
-        countUp('#doc-stat-today-patients', mySessionsToday.length);
+        $('#doc-stat-today-revenue').textContent = fmt(myRevToday);
+        $('#doc-stat-today-patients').textContent = mySessionsToday.length;
 
         const list = $('#doctor-patients-list');
         if (mySessionsToday.length === 0) {
             list.innerHTML = `
                 <div class="text-center py-10 border border-dashed border-cyan-500/20 rounded-2xl">
-                    <div class="text-4xl mb-2 opacity-40">🩺</div>
-                    <p class="text-gray-400 text-xs font-tajawal">لم تسجل أي جلسات اليوم بعد</p>
+                    <div class="text-5xl mb-2 opacity-40">🩺</div>
+                    <p class="text-gray-400 text-xs font-cairo">لم تسجل أي جلسات اليوم بعد</p>
                     <p class="text-gray-500 text-[11px] mt-1 font-tajawal">اضغط الزر أعلاه لإضافة أول مراجع</p>
                 </div>
             `;
         } else {
             list.innerHTML = mySessionsToday.map(s => `
-                <div class="p-3.5 rounded-2xl bg-black/40 border border-white/10 hover:border-cyan-400/30 transition-all font-tajawal">
+                <div class="p-4 rounded-2xl bg-black/40 border border-white/10 hover:border-cyan-400/30 transition-all font-tajawal">
                     <div class="flex items-center justify-between mb-1.5">
-                        <span class="font-bold text-white text-sm">${escapeHtml(s.patientName)}</span>
+                        <span class="font-bold text-white text-sm font-cairo">${escapeHtml(s.patientName)}</span>
                         <span class="font-mono font-black text-emerald-400 text-sm">${fmt(s.finalPrice)} IQD</span>
                     </div>
                     <div class="text-xs text-gray-300">العلاج: ${escapeHtml(s.treatmentName)}</div>
@@ -1141,6 +1155,7 @@
         }
     }
 
+    // Submit Patient Session with Automated WhatsApp Message Dispatch
     async function submitPatientSession() {
         if (!State.currentUser || State.currentUser.role !== 'doctor') {
             toast('جلسة الطبيب غير صالحة', 'error');
@@ -1166,6 +1181,7 @@
         const formattedNow = formatDate(nowIso);
         const formattedSession2 = formatDate(session2Date);
 
+        // Required Exact Notification Template
         const notificationText = 
 `مرحباً بك في عيادة الدكتور ${State.currentUser.name}
 اسم المريض: ${patientName}
@@ -1194,10 +1210,14 @@
 
         try {
             await window.MedicalFirebase.recordPatientSessionCloud(sessionPayload);
+
             closeAddPatientFullScreen();
             renderDoctorDashboard();
             toast('تم حفظ الجلسة بنجاح ✓ جارِ فتح WhatsApp تلقائياً...', 'success');
+
+            // Automatic WhatsApp Dispatch to Patient
             triggerWhatsAppDispatch(patientPhone, notificationText);
+
         } catch (err) {
             console.error('Session Save Error:', err);
             toast('فشل الحفظ في السحابة: ' + (err.message || 'خطأ غير متوقع'), 'error');
@@ -1227,14 +1247,9 @@
 
     // ==================== 11. LIFECYCLE & SYNC PIPELINE ====================
     async function initSystem() {
-        showGridSkeleton('quick-doctors-grid', 3);
-        showGridSkeleton('doctors-cards-grid', 6);
-        showTableSkeleton('treatments-table-body', 5);
-        showTableSkeleton('all-sessions-table-body', 5);
-        showTableSkeleton('consumed-products-table-body', 5);
-
         await window.MedicalFirebase.init();
 
+        // Restore active session
         const cachedSession = localStorage.getItem('medinexus_session');
         if (cachedSession) {
             try {
@@ -1245,6 +1260,7 @@
             }
         }
 
+        // Real-Time Subscriptions
         window.MedicalFirebase.subscribeFinances(data => {
             State.finances = data || { dailyTotal: 0, monthlyTotal: 0 };
             renderFinances();
@@ -1258,7 +1274,7 @@
         window.MedicalFirebase.subscribeDoctors(list => {
             State.doctors = list || [];
             renderDoctors();
-            renderFinances();
+            renderFinances(); // updates active doctors count
 
             if (State.currentUser && State.currentUser.role === 'doctor') {
                 const liveMe = State.doctors.find(d => d.uid === State.currentUser.uid);
@@ -1294,11 +1310,13 @@
             renderActivities();
         });
 
+        // Live Clock
         setInterval(() => {
             const clockEl = $('#live-clock');
             if (clockEl) clockEl.textContent = new Date().toLocaleTimeString('en-GB');
         }, 1000);
 
+        // Escape Key Modal Dismissal
         document.addEventListener('keydown', e => {
             if (e.key === 'Escape') {
                 ['modal-add-doctor', 'modal-doctor-details', 'modal-add-treatment', 'modal-edit-treatment', 'modal-consumed-details', 'modal-add-debt', 'modal-sys-alert', 'modal-sys-confirm'].forEach(id => closeModal(id));
@@ -1309,9 +1327,10 @@
             }
         });
 
-        console.log('%c🚀 MEDINEXUS PRO Master Architecture Online', 'color:#00F0FF;font-weight:900');
+        console.log('%c🚀 MEDINEXUS PRO Cyber Liquid Glass Engine Armed & Ready', 'color:#00F0FF;font-weight:900');
     }
 
+    // Public Surface API
     window.ClinicEngine = {
         openDrawer, closeDrawer,
         handleGlobalLogin, handleGlobalLogout,
